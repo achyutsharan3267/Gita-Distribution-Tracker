@@ -133,42 +133,42 @@ const DistributionForm = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-spiritual-800 mb-2">
+      <div className="text-center mb-6 sm:mb-8 px-2">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
           Daily Distribution Form
         </h1>
-        <p className="text-gray-600">Submit your daily book distribution data</p>
+        <p className="text-sm sm:text-base text-gray-600">Submit your daily book distribution data</p>
       </div>
 
       {/* Current User Info */}
-      <div className="card mb-6 bg-gradient-to-r from-spiritual-50 to-primary-50">
-        <div className="flex items-center space-x-4">
+      <div className="card mb-4 sm:mb-6 bg-gradient-to-r from-spiritual-50 to-primary-50 p-4 sm:p-6">
+        <div className="flex items-center space-x-3 sm:space-x-4">
           <img
             src={currentUserProfile.photo}
             alt={currentUserProfile.name}
-            className="w-16 h-16 rounded-full border-2 border-white shadow-md"
+            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full border-2 border-white shadow-md flex-shrink-0"
           />
-          <div>
-            <h3 className="text-xl font-bold text-gray-800">{currentUserProfile.name}</h3>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800 truncate">{currentUserProfile.name}</h3>
             {currentUserProfile.city && (
-              <p className="text-gray-600">📍 {currentUserProfile.city}</p>
+              <p className="text-sm sm:text-base text-gray-600 truncate">📍 {currentUserProfile.city}</p>
             )}
-            <p className="text-sm text-spiritual-600 mt-1">Your Distribution Profile</p>
+            <p className="text-xs sm:text-sm text-spiritual-600 mt-1">Your Distribution Profile</p>
           </div>
         </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="card space-y-6">
+      <form onSubmit={handleSubmit} className="card space-y-4 sm:space-y-6 p-4 sm:p-6">
         {errors.general && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             {errors.general}
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               Hindi Gita Distributed
             </label>
             <input
@@ -177,13 +177,13 @@ const DistributionForm = () => {
               value={formData.hindiGita}
               onChange={handleChange}
               min="0"
-              className="input-field"
+              className="input-field text-sm sm:text-base"
               placeholder="0"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               English Gita Distributed
             </label>
             <input
@@ -192,13 +192,13 @@ const DistributionForm = () => {
               value={formData.englishGita}
               onChange={handleChange}
               min="0"
-              className="input-field"
+              className="input-field text-sm sm:text-base"
               placeholder="0"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               Small Books Distributed
             </label>
             <input
@@ -207,13 +207,13 @@ const DistributionForm = () => {
               value={formData.smallBooks}
               onChange={handleChange}
               min="0"
-              className="input-field"
+              className="input-field text-sm sm:text-base"
               placeholder="0"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               📿 Bhagavatam
             </label>
             <input
@@ -222,13 +222,13 @@ const DistributionForm = () => {
               value={formData.bhagavatam}
               onChange={handleChange}
               min="0"
-              className="input-field"
+              className="input-field text-sm sm:text-base"
               placeholder="0"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               📿 Chaitanya Charitamrita
             </label>
             <input
@@ -237,13 +237,13 @@ const DistributionForm = () => {
               value={formData.chaitanyaCharitamrita}
               onChange={handleChange}
               min="0"
-              className="input-field"
+              className="input-field text-sm sm:text-base"
               placeholder="0"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
               📚 Other Prabhupada Books
             </label>
             <input
@@ -252,7 +252,7 @@ const DistributionForm = () => {
               value={formData.otherBooks}
               onChange={handleChange}
               min="0"
-              className="input-field"
+              className="input-field text-sm sm:text-base"
               placeholder="0"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -261,12 +261,12 @@ const DistributionForm = () => {
           </div>
         </div>
 
-        <div className="border-t pt-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Money Details</h3>
+        <div className="border-t pt-4 sm:pt-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Money Details</h3>
           
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                 Total Money Received (₹)
               </label>
               <input
@@ -276,14 +276,14 @@ const DistributionForm = () => {
                 onChange={handleChange}
                 min="0"
                 step="0.01"
-                className="input-field"
+                className="input-field text-sm sm:text-base"
                 placeholder="0.00"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   Money Paid Online (₹)
                 </label>
                 <input
@@ -293,13 +293,13 @@ const DistributionForm = () => {
                   onChange={handleChange}
                   min="0"
                   step="0.01"
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                   placeholder="0.00"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   Money Paid Offline (₹)
                 </label>
                 <input
@@ -309,7 +309,7 @@ const DistributionForm = () => {
                   onChange={handleChange}
                   min="0"
                   step="0.01"
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                   placeholder="0.00"
                 />
               </div>
@@ -323,18 +323,18 @@ const DistributionForm = () => {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary flex-1 text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary flex-1 text-base sm:text-lg py-2.5 sm:py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Submitting...' : '📝 Submit Distribution'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="btn-secondary flex-1 text-lg py-3"
+            className="btn-secondary flex-1 text-base sm:text-lg py-2.5 sm:py-3"
           >
             Cancel
           </button>
@@ -342,23 +342,23 @@ const DistributionForm = () => {
       </form>
 
       {/* Current Stats Preview */}
-      <div className="card mt-6 bg-gray-50">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Current Totals</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="card mt-4 sm:mt-6 bg-gray-50 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Your Current Totals</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-spiritual-600">{currentUserProfile.hindiGita}</p>
+            <p className="text-xl sm:text-2xl font-bold text-spiritual-600">{currentUserProfile.hindiGita}</p>
             <p className="text-xs text-gray-600">Hindi Gita</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-primary-600">{currentUserProfile.englishGita}</p>
+            <p className="text-xl sm:text-2xl font-bold text-primary-600">{currentUserProfile.englishGita}</p>
             <p className="text-xs text-gray-600">English Gita</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">{currentUserProfile.smallBooks}</p>
+            <p className="text-xl sm:text-2xl font-bold text-green-600">{currentUserProfile.smallBooks}</p>
             <p className="text-xs text-gray-600">Small Books</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-purple-600">
+            <p className="text-xl sm:text-2xl font-bold text-purple-600">
               ₹{currentUserProfile.totalMoney.toLocaleString()}
             </p>
             <p className="text-xs text-gray-600">Total Money</p>

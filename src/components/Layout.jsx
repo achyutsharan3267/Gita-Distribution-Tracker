@@ -50,25 +50,26 @@ const Layout = ({ children }) => {
       <header className="bg-white shadow-lg sticky top-0 z-50 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link to="/" className="flex items-center space-x-2">
-              <span className="text-2xl">🕉️</span>
-              <h1 className="text-xl font-bold text-spiritual-700">
-                Gita Distribution Tracker
+            <Link to="/" className="flex items-center space-x-1 sm:space-x-2 min-w-0 flex-1">
+              <span className="text-xl sm:text-2xl flex-shrink-0">🕉️</span>
+              <h1 className="text-base sm:text-lg md:text-xl font-bold text-spiritual-700 truncate">
+                <span className="hidden sm:inline">Gita Distribution Tracker</span>
+                <span className="sm:hidden">Gita Tracker</span>
               </h1>
             </Link>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
               <nav className="hidden md:flex space-x-1">
                 {navItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
+                    className={`px-3 lg:px-4 py-2 rounded-lg transition-colors text-sm lg:text-base ${
                       location.pathname === item.path
                         ? 'bg-spiritual-600 text-white'
                         : 'text-gray-700 hover:bg-spiritual-100'
                     }`}
                   >
-                    <span className="mr-2">{item.icon}</span>
+                    <span className="mr-1 lg:mr-2">{item.icon}</span>
                     {item.label}
                   </Link>
                 ))}
@@ -77,23 +78,23 @@ const Layout = ({ children }) => {
                 <div className="relative" ref={menuRef}>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-spiritual-500"
+                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-spiritual-500"
                   >
                     <img
                       src={currentUserProfile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email || 'User')}&background=a855f7&color=fff&size=128`}
                       alt={currentUserProfile?.name || user.email}
-                      className="w-10 h-10 rounded-full border-2 border-spiritual-300 object-cover"
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-spiritual-300 object-cover flex-shrink-0"
                     />
-                    <div className="hidden text-left">
-                      <p className="text-sm font-medium text-gray-800">
+                    <div className="hidden lg:block text-left">
+                      <p className="text-sm font-medium text-gray-800 truncate max-w-[120px]">
                         {currentUserProfile?.name || user.email?.split('@')[0]}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 truncate max-w-[120px]">
                         {user.email}
                       </p>
                     </div>
                     <svg
-                      className={`w-4 h-4 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
+                      className={`w-3 h-3 sm:w-4 sm:h-4 text-gray-500 transition-transform flex-shrink-0 ${showUserMenu ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -104,9 +105,9 @@ const Layout = ({ children }) => {
 
                   {/* User Menu Dropdown */}
                   {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                    <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
                       <div className="px-4 py-3 border-b border-gray-200">
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className="text-sm font-semibold text-gray-800 truncate">
                           {currentUserProfile?.name || user.email?.split('@')[0]}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
@@ -158,16 +159,16 @@ const Layout = ({ children }) => {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1 sm:space-x-2">
                   <Link
                     to="/login"
-                    className="px-4 py-2 text-sm bg-spiritual-600 hover:bg-spiritual-700 text-white rounded-lg transition-colors font-medium"
+                    className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-spiritual-600 hover:bg-spiritual-700 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
                   >
                     Login
                   </Link>
                   <Link
                     to="/signup"
-                    className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium"
+                    className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
                   >
                     Sign Up
                   </Link>
@@ -198,7 +199,7 @@ const Layout = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         {children}
       </main>
 

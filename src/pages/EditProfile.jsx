@@ -152,14 +152,14 @@ const EditProfile = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-spiritual-800 mb-2">
+      <div className="text-center mb-6 sm:mb-8 px-2">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
           Edit Profile
         </h1>
-        <p className="text-gray-600">Update your profile information</p>
+        <p className="text-sm sm:text-base text-gray-600">Update your profile information</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card space-y-6">
+      <form onSubmit={handleSubmit} className="card space-y-4 sm:space-y-6 p-4 sm:p-6">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
             {error}
@@ -259,23 +259,23 @@ const EditProfile = () => {
         </div>
 
         {/* Current Stats (Read-only) */}
-        <div className="border-t pt-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Current Stats</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center bg-spiritual-50 rounded-lg p-3">
-              <p className="text-2xl font-bold text-spiritual-600">{currentUserProfile.hindiGita}</p>
+        <div className="border-t pt-4 sm:pt-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Your Current Stats</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="text-center bg-spiritual-50 rounded-lg p-2 sm:p-3">
+              <p className="text-xl sm:text-2xl font-bold text-spiritual-600">{currentUserProfile.hindiGita}</p>
               <p className="text-xs text-gray-600">Hindi Gita</p>
             </div>
-            <div className="text-center bg-primary-50 rounded-lg p-3">
-              <p className="text-2xl font-bold text-primary-600">{currentUserProfile.englishGita}</p>
+            <div className="text-center bg-primary-50 rounded-lg p-2 sm:p-3">
+              <p className="text-xl sm:text-2xl font-bold text-primary-600">{currentUserProfile.englishGita}</p>
               <p className="text-xs text-gray-600">English Gita</p>
             </div>
-            <div className="text-center bg-green-50 rounded-lg p-3">
-              <p className="text-2xl font-bold text-green-600">{currentUserProfile.smallBooks}</p>
+            <div className="text-center bg-green-50 rounded-lg p-2 sm:p-3">
+              <p className="text-xl sm:text-2xl font-bold text-green-600">{currentUserProfile.smallBooks}</p>
               <p className="text-xs text-gray-600">Small Books</p>
             </div>
-            <div className="text-center bg-purple-50 rounded-lg p-3">
-              <p className="text-2xl font-bold text-purple-600">
+            <div className="text-center bg-purple-50 rounded-lg p-2 sm:p-3">
+              <p className="text-xl sm:text-2xl font-bold text-purple-600">
                 ₹{currentUserProfile.totalMoney.toLocaleString()}
               </p>
               <p className="text-xs text-gray-600">Total Money</p>
@@ -284,18 +284,18 @@ const EditProfile = () => {
         </div>
 
         {/* Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
           <button
             type="submit"
             disabled={isSubmitting || !currentUserProfile}
-            className="btn-primary flex-1 text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary flex-1 text-base sm:text-lg py-2.5 sm:py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Updating...' : '💾 Save Changes'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="btn-secondary flex-1 text-lg py-3"
+            className="btn-secondary flex-1 text-base sm:text-lg py-2.5 sm:py-3"
           >
             Cancel
           </button>

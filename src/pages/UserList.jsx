@@ -25,30 +25,30 @@ const UserList = () => {
   }, [leaderboard, searchQuery]);
 
   return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-spiritual-800 mb-2">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
+      <div className="text-center px-2">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
           All Devotees
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm sm:text-base text-gray-600">
           View all devotees and their distribution summary
         </p>
       </div>
 
       {/* Search Bar */}
-      <div className="card">
-        <div className="flex flex-col md:flex-row gap-4 items-center">
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
           <div className="flex-1 w-full">
             <div className="relative">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, mobile number, or email..."
-                className="input-field pl-10 w-full"
+                placeholder="Search by name, mobile, or email..."
+                className="input-field pl-9 sm:pl-10 w-full text-sm sm:text-base"
               />
               <svg
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -60,39 +60,39 @@ const UserList = () => {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
               Clear
             </button>
           )}
         </div>
         {searchQuery && (
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-xs sm:text-sm text-gray-500 mt-2">
             Found {filteredLeaderboard.length} devotee{filteredLeaderboard.length !== 1 ? 's' : ''}
           </p>
         )}
       </div>
 
       {users.length === 0 ? (
-        <div className="card text-center py-16">
-          <div className="text-6xl mb-4">🕉️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">No Devotees found</h2>
-          <p className="text-gray-600 mb-6">There are no devotees registered yet.</p>
+        <div className="card text-center py-12 sm:py-16 p-4 sm:p-6">
+          <div className="text-5xl sm:text-6xl mb-4">🕉️</div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">No Devotees found</h2>
+          <p className="text-sm sm:text-base text-gray-600 mb-6">There are no devotees registered yet.</p>
         </div>
       ) : filteredLeaderboard.length === 0 ? (
-        <div className="card text-center py-16">
-          <div className="text-6xl mb-4">🔍</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">No results found</h2>
-          <p className="text-gray-600 mb-6">No devotees match your search query.</p>
+        <div className="card text-center py-12 sm:py-16 p-4 sm:p-6">
+          <div className="text-5xl sm:text-6xl mb-4">🔍</div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">No results found</h2>
+          <p className="text-sm sm:text-base text-gray-600 mb-6">No devotees match your search query.</p>
           <button
             onClick={() => setSearchQuery('')}
-            className="btn-primary"
+            className="btn-primary text-sm sm:text-base"
           >
             Clear Search
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredLeaderboard.map((user) => {
             const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
             return (
@@ -101,61 +101,61 @@ const UserList = () => {
                 to={`/user/${user.id}`}
                 className="group"
               >
-                <div className="card hover:shadow-2xl transition-all duration-300 group-hover:scale-105">
-                  <div className="flex items-center space-x-4 mb-4">
+                <div className="card p-4 sm:p-6 hover:shadow-2xl transition-all duration-300 group-hover:scale-105">
+                  <div className="flex items-center space-x-3 sm:space-x-4 mb-3 sm:mb-4">
                     <img
                       src={user.photo}
                       alt={user.name}
-                      className="w-16 h-16 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors"
+                      className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors flex-shrink-0"
                     />
-                    <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-800 group-hover:text-spiritual-600 transition-colors">
+                    <div className="flex-1 min-w-0">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-800 group-hover:text-spiritual-600 transition-colors truncate">
                       {user.name}
                     </h3>
-                    <div className="space-y-1">
+                    <div className="space-y-0.5 sm:space-y-1">
                       {user.city && (
-                        <p className="text-gray-600 text-sm">📍 {user.city}</p>
+                        <p className="text-gray-600 text-xs sm:text-sm truncate">📍 {user.city}</p>
                       )}
                       {user.mobileNumber && (
-                        <p className="text-gray-600 text-sm">📱 {user.mobileNumber}</p>
+                        <p className="text-gray-600 text-xs sm:text-sm truncate">📱 {user.mobileNumber}</p>
                       )}
                     </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="bg-spiritual-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-spiritual-600">{user.hindiGita}</p>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="bg-spiritual-50 rounded-lg p-2 sm:p-3 text-center">
+                      <p className="text-base sm:text-lg font-bold text-spiritual-600">{user.hindiGita}</p>
                       <p className="text-xs text-gray-600">Hindi Gita</p>
                     </div>
-                    <div className="bg-primary-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-primary-600">{user.englishGita}</p>
+                    <div className="bg-primary-50 rounded-lg p-2 sm:p-3 text-center">
+                      <p className="text-base sm:text-lg font-bold text-primary-600">{user.englishGita}</p>
                       <p className="text-xs text-gray-600">English Gita</p>
                     </div>
-                    <div className="bg-green-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-green-600">{user.smallBooks}</p>
+                    <div className="bg-green-50 rounded-lg p-2 sm:p-3 text-center">
+                      <p className="text-base sm:text-lg font-bold text-green-600">{user.smallBooks}</p>
                       <p className="text-xs text-gray-600">Small Books</p>
                     </div>
                   </div>
 
-                  <div className="border-t pt-4">
+                  <div className="border-t pt-3 sm:pt-4">
                     <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-gray-600">Total Distributed</p>
-                        <p className="text-2xl font-bold text-spiritual-600">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm text-gray-600">Total Distributed</p>
+                        <p className="text-xl sm:text-2xl font-bold text-spiritual-600">
                           {totalDistributed}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600">Money Collected</p>
-                        <p className="text-lg font-bold text-purple-600">
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <p className="text-xs sm:text-sm text-gray-600">Money Collected</p>
+                        <p className="text-base sm:text-lg font-bold text-purple-600">
                           ₹{user.totalMoney.toLocaleString()}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-4 border-t">
+                  <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
                     <p className="text-xs text-gray-500 text-center group-hover:text-spiritual-600 transition-colors">
                       Click to view full profile →
                     </p>
