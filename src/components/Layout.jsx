@@ -1,9 +1,15 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useStore } from '../store/useStore';
+import { useState, useRef, useEffect } from 'react';
 
 const Layout = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut, isAdmin } = useAuth();
+  const currentUserProfile = useStore((state) => state.currentUserProfile);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef(null);
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
@@ -11,15 +17,37 @@ const Layout = ({ children }) => {
     // Only show protected routes if user is logged in
     ...(user ? [
       { path: '/form', label: 'Submit Form', icon: '📝' },
-      { path: '/edit-profile', label: 'Edit Profile', icon: '👤' },
     ] : []),
     ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: '🔐' }] : []),
   ];
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
+
+  const handleLogout = async () => {
+    await signOut();
+    setShowUserMenu(false);
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-white shadow-md sticky top-0 z-50">
+      <header className="bg-white shadow-lg sticky top-0 z-50 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center space-x-2">
@@ -46,28 +74,100 @@ const Layout = ({ children }) => {
                 ))}
               </nav>
               {user ? (
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-600 hidden sm:inline">
-                    {user.email}
-                  </span>
+                <div className="relative" ref={menuRef}>
                   <button
-                    onClick={signOut}
-                    className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-spiritual-500"
                   >
-                    Logout
+                    <img
+                      src={currentUserProfile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email || 'User')}&background=a855f7&color=fff&size=128`}
+                      alt={currentUserProfile?.name || user.email}
+                      className="w-10 h-10 rounded-full border-2 border-spiritual-300 object-cover"
+                    />
+                    <div className="hidden text-left">
+                      <p className="text-sm font-medium text-gray-800">
+                        {currentUserProfile?.name || user.email?.split('@')[0]}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {user.email}
+                      </p>
+                    </div>
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
+
+                  {/* User Menu Dropdown */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                      <div className="px-4 py-3 border-b border-gray-200">
+                        <p className="text-sm font-semibold text-gray-800">
+                          {currentUserProfile?.name || user.email?.split('@')[0]}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {user.email}
+                        </p>
+                      </div>
+                      
+                      <div className="py-1">
+                        <Link
+                          to="/edit-profile"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-spiritual-50 transition-colors"
+                        >
+                          <span className="mr-3">👤</span>
+                          Edit Profile
+                        </Link>
+                        {currentUserProfile && (
+                          <Link
+                            to={`/user/${currentUserProfile.id}`}
+                            onClick={() => setShowUserMenu(false)}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-spiritual-50 transition-colors"
+                          >
+                            <span className="mr-3">📊</span>
+                            My Profile
+                          </Link>
+                        )}
+                        {isAdmin && (
+                          <Link
+                            to="/admin"
+                            onClick={() => setShowUserMenu(false)}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-spiritual-50 transition-colors"
+                          >
+                            <span className="mr-3">🔐</span>
+                            Admin Dashboard
+                          </Link>
+                        )}
+                      </div>
+
+                      <div className="border-t border-gray-200 py-1">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <span className="mr-3">🚪</span>
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
                   <Link
                     to="/login"
-                    className="px-4 py-2 text-sm bg-spiritual-600 hover:bg-spiritual-700 text-white rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm bg-spiritual-600 hover:bg-spiritual-700 text-white rounded-lg transition-colors font-medium"
                   >
                     Login
                   </Link>
                   <Link
                     to="/signup"
-                    className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium"
                   >
                     Sign Up
                   </Link>

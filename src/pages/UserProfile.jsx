@@ -106,9 +106,14 @@ const UserProfile = () => {
           />
           <div className="flex-1 text-center md:text-left">
             <h1 className="text-4xl font-bold mb-2">{user.name}</h1>
-            {user.city && (
-              <p className="text-xl text-spiritual-100 mb-4">📍 {user.city}</p>
-            )}
+            <div className="space-y-2 mb-4">
+              {user.city && (
+                <p className="text-xl text-spiritual-100">📍 {user.city}</p>
+              )}
+              {user.mobileNumber && (
+                <p className="text-lg text-spiritual-100">📱 {user.mobileNumber}</p>
+              )}
+            </div>
             <div className="flex flex-wrap gap-4 justify-center md:justify-start">
               <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
                 <p className="text-sm text-spiritual-100">Total Books</p>

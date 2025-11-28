@@ -10,6 +10,7 @@ const Signup = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [city, setCity] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [error, setError] = useState('');
@@ -60,6 +61,7 @@ const Signup = () => {
       await addUser({
         name,
         city: city || null,
+        mobileNumber: mobileNumber.trim() || null,
         photo: photoUrl,
         hindiGita: 0,
         englishGita: 0,
@@ -116,6 +118,23 @@ const Signup = () => {
                 className="input-field"
                 placeholder="Your City"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mobile Number (Optional)
+              </label>
+              <input
+                type="tel"
+                value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)}
+                className="input-field"
+                placeholder="+91 9876543210"
+                pattern="[0-9+\s-]*"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter your mobile/phone number
+              </p>
             </div>
 
             <div>

@@ -55,11 +55,20 @@ const DistributionForm = () => {
   const validate = () => {
     const newErrors = {};
     
-    if (formData.moneyReceived && (formData.moneyOnline || formData.moneyOffline)) {
-      const totalPaid = (Number(formData.moneyOnline) || 0) + (Number(formData.moneyOffline) || 0);
-      if (Math.abs(totalPaid - Number(formData.moneyReceived)) > 0.01) {
-        newErrors.moneyMismatch = 'Money received should equal money paid online + offline';
+    // Validate money: online + offline should be <= total money received
+    if (formData.moneyReceived) {
+      const totalReceived = Number(formData.moneyReceived) || 0;
+      const online = Number(formData.moneyOnline) || 0;
+      const offline = Number(formData.moneyOffline) || 0;
+      const totalPaid = online + offline;
+      
+      // Total paid should be less than or equal to total received
+      if (totalPaid > totalReceived) {
+        newErrors.moneyMismatch = `Total paid (₹${totalPaid.toLocaleString()}) cannot be more than total received (₹${totalReceived.toLocaleString()})`;
       }
+      
+      // If both online and offline are 0, but money received is entered, that's okay
+      // User might want to record money received without breaking it down
     }
 
     setErrors(newErrors);

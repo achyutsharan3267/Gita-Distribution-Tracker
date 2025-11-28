@@ -7,29 +7,83 @@ import { supabase } from '../lib/supabase';
 
 const EditProfile = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const currentUserProfile = useStore((state) => state.currentUserProfile);
   const initialize = useStore((state) => state.initialize);
+  const getCurrentUserProfile = useStore((state) => state.getCurrentUserProfile);
+  const loading = useStore((state) => state.loading);
 
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Load profile if not available
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user?.id) return;
+      
+      // If currentUserProfile is not loaded, try to load it
+      if (!currentUserProfile && !profileLoading) {
+        setProfileLoading(true);
+        try {
+          const profile = await getCurrentUserProfile(user.id);
+          if (profile) {
+            // Update store with profile
+            useStore.setState({ currentUserProfile: profile });
+          }
+        } catch (err) {
+          console.error('Error loading profile:', err);
+          setError('Failed to load profile. Please refresh the page.');
+        } finally {
+          setProfileLoading(false);
+        }
+      }
+    };
+
+    if (!authLoading && user?.id) {
+      loadProfile();
+    }
+  }, [user?.id, currentUserProfile, authLoading, getCurrentUserProfile, profileLoading]);
 
   useEffect(() => {
     if (currentUserProfile) {
       setName(currentUserProfile.name || '');
       setCity(currentUserProfile.city || '');
+      setMobileNumber(currentUserProfile.mobileNumber || '');
       setPhotoPreview(currentUserProfile.photo || null);
     }
   }, [currentUserProfile]);
 
-  if (!currentUserProfile) {
+  // Show loading state
+  if (authLoading || loading || profileLoading || !user) {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
-        <p className="text-gray-600">Loading profile...</p>
+        <div className="text-6xl mb-4 animate-bounce">🕉️</div>
+        <p className="text-gray-600 text-lg">Loading profile...</p>
+      </div>
+    );
+  }
+
+  // Show error if no profile found after loading
+  if (!currentUserProfile && !profileLoading && !loading) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Profile Not Found</h2>
+        <p className="text-gray-600 mb-6">
+          Your profile could not be loaded. Please try refreshing the page.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="btn-primary"
+        >
+          Refresh Page
+        </button>
       </div>
     );
   }
@@ -37,9 +91,17 @@ const EditProfile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setIsSubmitting(true);
 
     try {
+      if (!currentUserProfile || !currentUserProfile.id) {
+        throw new Error('Profile not loaded. Please refresh the page.');
+      }
+
+      if (!user?.id) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       let photoUrl = currentUserProfile.photo;
 
       // Upload new photo if provided
@@ -54,7 +116,7 @@ const EditProfile = () => {
         } catch (uploadError) {
           console.error('Photo upload failed:', uploadError);
           setError('Failed to upload photo. Please try again.');
-          setLoading(false);
+          setIsSubmitting(false);
           return;
         }
       }
@@ -65,11 +127,15 @@ const EditProfile = () => {
         .update({
           name: name.trim(),
           city: city.trim() || null,
+          mobile_number: mobileNumber.trim() || null,
           photo: photoUrl,
         })
         .eq('id', currentUserProfile.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw new Error(updateError.message || 'Failed to update profile');
+      }
 
       // Refresh store
       await initialize(user.id);
@@ -79,7 +145,8 @@ const EditProfile = () => {
     } catch (err) {
       console.error('Error updating profile:', err);
       setError(err.message || 'Failed to update profile. Please try again.');
-      setLoading(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -173,6 +240,24 @@ const EditProfile = () => {
           />
         </div>
 
+        {/* Mobile Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Mobile Number (Optional)
+          </label>
+          <input
+            type="tel"
+            value={mobileNumber}
+            onChange={(e) => setMobileNumber(e.target.value)}
+            className="input-field"
+            placeholder="+91 9876543210"
+            pattern="[0-9+\s-]*"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Enter your mobile/phone number
+          </p>
+        </div>
+
         {/* Current Stats (Read-only) */}
         <div className="border-t pt-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Current Stats</h3>
@@ -202,10 +287,10 @@ const EditProfile = () => {
         <div className="flex flex-col sm:flex-row gap-4 pt-4">
           <button
             type="submit"
-            disabled={loading}
+            disabled={isSubmitting || !currentUserProfile}
             className="btn-primary flex-1 text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Updating...' : '💾 Save Changes'}
+            {isSubmitting ? 'Updating...' : '💾 Save Changes'}
           </button>
           <button
             type="button"

@@ -2,26 +2,41 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 
 // Helper function to transform database user to app format
-const transformUser = (dbUser) => ({
-  id: dbUser.id,
-  name: dbUser.name,
-  city: dbUser.city || null,
-  photo: dbUser.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(dbUser.name)}&background=a855f7&color=fff&size=128`,
-  hindiGita: dbUser.hindi_gita || 0,
-  englishGita: dbUser.english_gita || 0,
-  smallBooks: dbUser.small_books || 0,
-  bhagavatam: dbUser.bhagavatam || 0,
-  chaitanyaCharitamrita: dbUser.chaitanya_charitamrita || 0,
-  otherBooks: dbUser.other_books || 0,
-  totalMoney: parseFloat(dbUser.total_money || 0),
-  activities: [], // Will be loaded separately
-});
+const transformUser = (dbUser) => {
+  // Handle email from different possible structures
+  let email = null;
+  if (dbUser.auth_users && Array.isArray(dbUser.auth_users) && dbUser.auth_users.length > 0) {
+    email = dbUser.auth_users[0]?.email || null;
+  } else if (dbUser.auth_users && typeof dbUser.auth_users === 'object' && dbUser.auth_users.email) {
+    email = dbUser.auth_users.email;
+  } else if (dbUser.email) {
+    email = dbUser.email;
+  }
+  
+  return {
+    id: dbUser.id,
+    name: dbUser.name,
+    city: dbUser.city || null,
+    mobileNumber: dbUser.mobile_number || null,
+    email: email,
+    photo: dbUser.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(dbUser.name)}&background=a855f7&color=fff&size=128`,
+    hindiGita: dbUser.hindi_gita || 0,
+    englishGita: dbUser.english_gita || 0,
+    smallBooks: dbUser.small_books || 0,
+    bhagavatam: dbUser.bhagavatam || 0,
+    chaitanyaCharitamrita: dbUser.chaitanya_charitamrita || 0,
+    otherBooks: dbUser.other_books || 0,
+    totalMoney: parseFloat(dbUser.total_money || 0),
+    activities: [], // Will be loaded separately
+  };
+};
 
 // Helper function to transform app user to database format
 const transformUserToDb = (user) => {
   const dbUser = {
     name: user.name,
     city: user.city || null,
+    mobile_number: user.mobileNumber || null,
     photo: user.photo || null,
     hindi_gita: user.hindiGita || 0,
     english_gita: user.englishGita || 0,
@@ -129,10 +144,37 @@ export const useStore = create((set, get) => ({
 
       console.log('Fetching users from database...');
       // Fetch all users (for leaderboard, etc.)
+      // Note: Email search requires database function or separate email fetch
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
+      
+      // Try to fetch emails separately and map them
+      // This is a workaround since direct join with auth.users isn't allowed
+      if (users && users.length > 0) {
+        try {
+          // Fetch auth user emails using a function if available
+          const { data: emailsData } = await supabase.rpc('get_users_with_email').catch(() => null);
+          if (emailsData) {
+            // Map emails to users
+            const emailMap = {};
+            emailsData.forEach((item) => {
+              if (item.id && item.email) {
+                emailMap[item.id] = item.email;
+              }
+            });
+            // Add emails to users
+            users.forEach((user) => {
+              if (emailMap[user.id]) {
+                user.email = emailMap[user.id];
+              }
+            });
+          }
+        } catch (err) {
+          console.log('Email fetch not available, continuing without email search');
+        }
+      }
 
       if (usersError) {
         console.error('Error fetching users:', usersError);
@@ -634,6 +676,7 @@ export const useStore = create((set, get) => ({
                 ...u,
                 name: updates.name,
                 city: updates.city,
+                mobileNumber: updates.mobileNumber || null,
                 photo: updates.photo,
                 hindiGita: updates.hindiGita,
                 englishGita: updates.englishGita,

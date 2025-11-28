@@ -60,6 +60,7 @@ const AdminDashboard = () => {
     setEditData({
       name: user.name,
       city: user.city || '',
+      mobileNumber: user.mobileNumber || '',
       hindiGita: user.hindiGita,
       englishGita: user.englishGita,
       smallBooks: user.smallBooks,
@@ -75,7 +76,10 @@ const AdminDashboard = () => {
   const handleSaveEdit = async () => {
     try {
       setLoading(true);
-      await updateUserProfile(selectedUser.id, editData);
+      await updateUserProfile(selectedUser.id, {
+        ...editData,
+        mobileNumber: editData.mobileNumber,
+      });
       alert('User profile updated successfully');
       setShowEditModal(false);
       setSelectedUser(null);
@@ -283,6 +287,16 @@ const AdminDashboard = () => {
                   value={editData.city}
                   onChange={(e) => setEditData({ ...editData, city: e.target.value })}
                   className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                <input
+                  type="tel"
+                  value={editData.mobileNumber}
+                  onChange={(e) => setEditData({ ...editData, mobileNumber: e.target.value })}
+                  className="input-field"
+                  placeholder="+91 9876543210"
                 />
               </div>
               <div className="grid grid-cols-3 gap-4">

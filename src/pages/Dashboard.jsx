@@ -6,8 +6,10 @@ const Dashboard = () => {
   const leaderboard = useStore((state) => state.getLeaderboard());
   const activeDevotees = useStore((state) => state.getActiveDevotees());
 
-  const top3 = leaderboard.slice(0, 3);
-  const top10 = leaderboard.slice(0, 10);
+  // Filter out users with 0 total books
+  const activeLeaderboard = leaderboard.filter((user) => user.totalDistributed > 0);
+  const top3 = activeLeaderboard.slice(0, 3);
+  const top10 = activeLeaderboard.slice(0, 10);
 
   const StatCard = ({ title, value, icon, color }) => (
     <div className="card">
@@ -79,8 +81,13 @@ const Dashboard = () => {
           <span className="mr-2">🏆</span>
           Top 3 Devotees
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {top3.map((user, index) => (
+        {top3.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No Devotees found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {top3.map((user, index) => (
             <Link
               key={user.id}
               to={`/user/${user.id}`}
@@ -111,8 +118,9 @@ const Dashboard = () => {
                 </div>
               </div>
             </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Top 10 Leaderboard */}
@@ -134,7 +142,14 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {top10.map((user, index) => (
+              {top10.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-12 text-center">
+                    <p className="text-gray-500 text-lg">No Devotees found</p>
+                  </td>
+                </tr>
+              ) : (
+                top10.map((user, index) => (
                 <tr
                   key={user.id}
                   className="border-b border-gray-100 hover:bg-spiritual-50 transition-colors"
@@ -181,7 +196,8 @@ const Dashboard = () => {
                     {user.totalDistributed}
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
