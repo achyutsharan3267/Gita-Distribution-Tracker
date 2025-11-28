@@ -130,82 +130,95 @@ const Dashboard = () => {
           <span className="hidden sm:inline">Top 10 Devotees Leaderboard</span>
           <span className="sm:hidden">Top 10 Leaderboard</span>
         </h2>
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <div className="inline-block min-w-full align-middle">
-            <div className="overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <table className="min-w-[950px] sm:min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">#</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Rank</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[120px]">Devotee</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Hindi</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">English</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Small</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Bhagavatam</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Chaitanya</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Other</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Total</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {top10.length === 0 ? (
                   <tr>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase">Rank</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase">Devotee</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase">Hindi</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase hidden sm:table-cell">English</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Small</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase">Total</th>
+                    <td colSpan="10" className="py-8 sm:py-12 text-center">
+                      <p className="text-gray-500 text-base sm:text-lg">No Devotees found</p>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {top10.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" className="py-8 sm:py-12 text-center">
-                        <p className="text-gray-500 text-base sm:text-lg">No Devotees found</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    top10.map((user, index) => (
-                    <tr
-                      key={user.id}
-                      className="border-b border-gray-100 hover:bg-spiritual-50 transition-colors"
-                    >
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full font-bold text-xs sm:text-sm ${
-                            index === 0
-                              ? 'bg-yellow-400 text-yellow-900'
-                              : index === 1
-                              ? 'bg-gray-300 text-gray-800'
-                              : index === 2
-                              ? 'bg-orange-300 text-orange-900'
-                              : 'bg-gray-200 text-gray-700'
-                          }`}
-                        >
-                          {index + 1}
-                        </span>
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap">
-                        <Link
-                          to={`/user/${user.id}`}
-                          className="flex items-center space-x-2 sm:space-x-3 group"
-                        >
-                          <img
-                            src={user.photo}
-                            alt={user.name}
-                            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
-                              {user.name}
-                            </p>
-                            {user.city && (
-                              <p className="text-xs text-gray-500 truncate">📍 {user.city}</p>
-                            )}
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.hindiGita}</td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap hidden sm:table-cell">{user.englishGita}</td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap hidden md:table-cell">{user.smallBooks}</td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 text-right font-bold text-sm sm:text-base text-spiritual-600 whitespace-nowrap">
-                        {user.totalDistributed}
-                      </td>
-                    </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ) : (
+                  top10.map((user, index) => (
+                  <tr
+                    key={user.id}
+                    className="border-b border-gray-100 hover:bg-spiritual-50 transition-colors"
+                  >
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                      <Link
+                        to={`/user/${user.id}`}
+                        className="flex justify-center group"
+                      >
+                        <img
+                          src={user.photo}
+                          alt={user.name}
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors flex-shrink-0"
+                        />
+                      </Link>
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                      <span
+                        className={`inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full font-bold text-xs sm:text-sm ${
+                          index === 0
+                            ? 'bg-yellow-400 text-yellow-900'
+                            : index === 1
+                            ? 'bg-gray-300 text-gray-800'
+                            : index === 2
+                            ? 'bg-orange-300 text-orange-900'
+                            : 'bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap min-w-[120px]">
+                      <Link
+                        to={`/user/${user.id}`}
+                        className="group"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
+                            {user.name}
+                          </p>
+                          {user.city && (
+                            <p className="text-xs text-gray-500 truncate">📍 {user.city}</p>
+                          )}
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.hindiGita}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.englishGita}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.smallBooks}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.bhagavatam || 0}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.chaitanyaCharitamrita || 0}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.otherBooks || 0}</td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-bold text-sm sm:text-base text-spiritual-600 whitespace-nowrap">
+                      {user.totalDistributed}
+                    </td>
+                  </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
+        <p className="text-xs text-gray-500 mt-2 sm:hidden text-center">← Swipe to see all columns →</p>
       </div>
 
       {/* Quick Actions */}
