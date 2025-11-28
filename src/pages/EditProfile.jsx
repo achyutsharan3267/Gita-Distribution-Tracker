@@ -119,9 +119,11 @@ const EditProfile = () => {
                 onChange={(e) => {
                   const file = e.target.files[0];
                   if (file) {
-                    // Validate file size
-                    if (file.size > 5 * 1024 * 1024) {
-                      setError('Image size must be less than 5MB');
+                    // Validate file size (150 KB max)
+                    const maxSize = 150 * 1024; // 150 KB in bytes
+                    if (file.size > maxSize) {
+                      const fileSizeKB = (file.size / 1024).toFixed(2);
+                      setError(`Image size is ${fileSizeKB} KB. Maximum allowed size is 150 KB. Please compress your image.`);
                       return;
                     }
                     setPhoto(file);
@@ -136,7 +138,7 @@ const EditProfile = () => {
                 className="input-field text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Max size: 5MB. Supported: JPG, PNG, GIF
+                Max size: 150 KB. Supported: JPG, PNG, WebP
               </p>
             </div>
           </div>

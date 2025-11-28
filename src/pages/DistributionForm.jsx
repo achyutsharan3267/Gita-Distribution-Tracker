@@ -29,6 +29,9 @@ const DistributionForm = () => {
     hindiGita: '',
     englishGita: '',
     smallBooks: '',
+    bhagavatam: '',
+    chaitanyaCharitamrita: '',
+    otherBooks: '',
     moneyReceived: '',
     moneyOnline: '',
     moneyOffline: '',
@@ -76,6 +79,9 @@ const DistributionForm = () => {
       hindiGita: Number(formData.hindiGita) || 0,
       englishGita: Number(formData.englishGita) || 0,
       smallBooks: Number(formData.smallBooks) || 0,
+      bhagavatam: Number(formData.bhagavatam) || 0,
+      chaitanyaCharitamrita: Number(formData.chaitanyaCharitamrita) || 0,
+      otherBooks: Number(formData.otherBooks) || 0,
       moneyReceived: Number(formData.moneyReceived) || 0,
       moneyOnline: Number(formData.moneyOnline) || 0,
       moneyOffline: Number(formData.moneyOffline) || 0,
@@ -97,6 +103,9 @@ const DistributionForm = () => {
         hindiGita: '',
         englishGita: '',
         smallBooks: '',
+        bhagavatam: '',
+        chaitanyaCharitamrita: '',
+        otherBooks: '',
         moneyReceived: '',
         moneyOnline: '',
         moneyOffline: '',
@@ -192,6 +201,54 @@ const DistributionForm = () => {
               className="input-field"
               placeholder="0"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📿 Bhagavatam
+            </label>
+            <input
+              type="number"
+              name="bhagavatam"
+              value={formData.bhagavatam}
+              onChange={handleChange}
+              min="0"
+              className="input-field"
+              placeholder="0"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📿 Chaitanya Charitamrita
+            </label>
+            <input
+              type="number"
+              name="chaitanyaCharitamrita"
+              value={formData.chaitanyaCharitamrita}
+              onChange={handleChange}
+              min="0"
+              className="input-field"
+              placeholder="0"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📚 Other Prabhupada Books
+            </label>
+            <input
+              type="number"
+              name="otherBooks"
+              value={formData.otherBooks}
+              onChange={handleChange}
+              min="0"
+              className="input-field"
+              placeholder="0"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Other Srila Prabhupada books
+            </p>
           </div>
         </div>
 

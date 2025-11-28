@@ -10,6 +10,9 @@ const transformUser = (dbUser) => ({
   hindiGita: dbUser.hindi_gita || 0,
   englishGita: dbUser.english_gita || 0,
   smallBooks: dbUser.small_books || 0,
+  bhagavatam: dbUser.bhagavatam || 0,
+  chaitanyaCharitamrita: dbUser.chaitanya_charitamrita || 0,
+  otherBooks: dbUser.other_books || 0,
   totalMoney: parseFloat(dbUser.total_money || 0),
   activities: [], // Will be loaded separately
 });
@@ -23,6 +26,9 @@ const transformUserToDb = (user) => {
     hindi_gita: user.hindiGita || 0,
     english_gita: user.englishGita || 0,
     small_books: user.smallBooks || 0,
+    bhagavatam: user.bhagavatam || 0,
+    chaitanya_charitamrita: user.chaitanyaCharitamrita || 0,
+    other_books: user.otherBooks || 0,
     total_money: user.totalMoney || 0,
   };
   // Explicitly set auth_user_id to NULL so trigger can set it
@@ -38,6 +44,9 @@ const transformActivity = (dbActivity) => ({
   hindiGita: dbActivity.hindi_gita || 0,
   englishGita: dbActivity.english_gita || 0,
   smallBooks: dbActivity.small_books || 0,
+  bhagavatam: dbActivity.bhagavatam || 0,
+  chaitanyaCharitamrita: dbActivity.chaitanya_charitamrita || 0,
+  otherBooks: dbActivity.other_books || 0,
   moneyReceived: parseFloat(dbActivity.money_received || 0),
   moneyOnline: parseFloat(dbActivity.money_online || 0),
   moneyOffline: parseFloat(dbActivity.money_offline || 0),
@@ -271,6 +280,9 @@ export const useStore = create((set, get) => ({
       const newHindiGita = user.hindiGita + (distribution.hindiGita || 0);
       const newEnglishGita = user.englishGita + (distribution.englishGita || 0);
       const newSmallBooks = user.smallBooks + (distribution.smallBooks || 0);
+      const newBhagavatam = (user.bhagavatam || 0) + (distribution.bhagavatam || 0);
+      const newChaitanyaCharitamrita = (user.chaitanyaCharitamrita || 0) + (distribution.chaitanyaCharitamrita || 0);
+      const newOtherBooks = (user.otherBooks || 0) + (distribution.otherBooks || 0);
       const newTotalMoney = user.totalMoney + (distribution.moneyReceived || 0);
 
       // Update user totals in database
@@ -280,6 +292,9 @@ export const useStore = create((set, get) => ({
           hindi_gita: newHindiGita,
           english_gita: newEnglishGita,
           small_books: newSmallBooks,
+          bhagavatam: newBhagavatam,
+          chaitanya_charitamrita: newChaitanyaCharitamrita,
+          other_books: newOtherBooks,
           total_money: newTotalMoney,
         })
         .eq('id', userId);
@@ -296,6 +311,9 @@ export const useStore = create((set, get) => ({
             hindi_gita: distribution.hindiGita || 0,
             english_gita: distribution.englishGita || 0,
             small_books: distribution.smallBooks || 0,
+            bhagavatam: distribution.bhagavatam || 0,
+            chaitanya_charitamrita: distribution.chaitanyaCharitamrita || 0,
+            other_books: distribution.otherBooks || 0,
             money_received: distribution.moneyReceived || 0,
             money_online: distribution.moneyOnline || 0,
             money_offline: distribution.moneyOffline || 0,
@@ -317,6 +335,9 @@ export const useStore = create((set, get) => ({
                 hindiGita: newHindiGita,
                 englishGita: newEnglishGita,
                 smallBooks: newSmallBooks,
+                bhagavatam: newBhagavatam,
+                chaitanyaCharitamrita: newChaitanyaCharitamrita,
+                otherBooks: newOtherBooks,
                 totalMoney: newTotalMoney,
                 activities: [newActivity, ...u.activities],
               }
@@ -331,6 +352,9 @@ export const useStore = create((set, get) => ({
                 hindiGita: newHindiGita,
                 englishGita: newEnglishGita,
                 smallBooks: newSmallBooks,
+                bhagavatam: newBhagavatam,
+                chaitanyaCharitamrita: newChaitanyaCharitamrita,
+                otherBooks: newOtherBooks,
                 totalMoney: newTotalMoney,
                 activities: [newActivity, ...(state.currentUserProfile.activities || [])],
               }
@@ -371,10 +395,13 @@ export const useStore = create((set, get) => ({
         hindiGita: acc.hindiGita + user.hindiGita,
         englishGita: acc.englishGita + user.englishGita,
         smallBooks: acc.smallBooks + user.smallBooks,
+        bhagavatam: acc.bhagavatam + (user.bhagavatam || 0),
+        chaitanyaCharitamrita: acc.chaitanyaCharitamrita + (user.chaitanyaCharitamrita || 0),
+        otherBooks: acc.otherBooks + (user.otherBooks || 0),
         totalMoney: acc.totalMoney + user.totalMoney,
         totalUsers: state.users.length,
       }),
-      { hindiGita: 0, englishGita: 0, smallBooks: 0, totalMoney: 0, totalUsers: 0 }
+      { hindiGita: 0, englishGita: 0, smallBooks: 0, bhagavatam: 0, chaitanyaCharitamrita: 0, otherBooks: 0, totalMoney: 0, totalUsers: 0 }
     );
   },
 
@@ -382,20 +409,20 @@ export const useStore = create((set, get) => ({
     const state = get();
     return [...state.users]
       .sort((a, b) => {
-        const totalA = a.hindiGita + a.englishGita + a.smallBooks;
-        const totalB = b.hindiGita + b.englishGita + b.smallBooks;
+        const totalA = a.hindiGita + a.englishGita + a.smallBooks + (a.bhagavatam || 0) + (a.chaitanyaCharitamrita || 0) + (a.otherBooks || 0);
+        const totalB = b.hindiGita + b.englishGita + b.smallBooks + (b.bhagavatam || 0) + (b.chaitanyaCharitamrita || 0) + (b.otherBooks || 0);
         return totalB - totalA;
       })
       .map((user) => ({
         ...user,
-        totalDistributed: user.hindiGita + user.englishGita + user.smallBooks,
+        totalDistributed: user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0),
       }));
   },
 
   getActiveDevotees: () => {
     const state = get();
     return state.users.filter((user) => {
-      const total = user.hindiGita + user.englishGita + user.smallBooks;
+      const total = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
       return total > 0;
     });
   },
@@ -554,6 +581,138 @@ export const useStore = create((set, get) => ({
       state.realtimeSubscriptions.users?.unsubscribe();
       state.realtimeSubscriptions.activities?.unsubscribe();
       set({ realtimeSubscriptions: null });
+    }
+  },
+
+  // Admin functions
+  deleteUser: async (userId) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Update local state
+      set((state) => ({
+        users: state.users.filter((u) => u.id !== userId),
+      }));
+
+      console.log('✅ User deleted successfully');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  },
+
+  updateUserProfile: async (userId, updates) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: updates.name,
+          city: updates.city,
+          photo: updates.photo,
+          hindi_gita: updates.hindiGita,
+          english_gita: updates.englishGita,
+          small_books: updates.smallBooks,
+          bhagavatam: updates.bhagavatam,
+          chaitanya_charitamrita: updates.chaitanyaCharitamrita,
+          other_books: updates.otherBooks,
+          total_money: updates.totalMoney,
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Update local state
+      set((state) => ({
+        users: state.users.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                name: updates.name,
+                city: updates.city,
+                photo: updates.photo,
+                hindiGita: updates.hindiGita,
+                englishGita: updates.englishGita,
+                smallBooks: updates.smallBooks,
+                bhagavatam: updates.bhagavatam,
+                chaitanyaCharitamrita: updates.chaitanyaCharitamrita,
+                otherBooks: updates.otherBooks,
+                totalMoney: updates.totalMoney,
+              }
+            : u
+        ),
+      }));
+
+      console.log('✅ User profile updated successfully');
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  },
+
+  deleteActivity: async (activityId) => {
+    try {
+      // Get activity to update user totals
+      const { data: activity, error: fetchError } = await supabase
+        .from('activities')
+        .select('*, users!inner(*)')
+        .eq('id', activityId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Delete activity
+      const { error } = await supabase
+        .from('activities')
+        .delete()
+        .eq('id', activityId);
+
+      if (error) throw error;
+
+      // Update user totals
+      const user = activity.users;
+      const updatedUser = {
+        hindi_gita: Math.max(0, user.hindi_gita - (activity.hindi_gita || 0)),
+        english_gita: Math.max(0, user.english_gita - (activity.english_gita || 0)),
+        small_books: Math.max(0, user.small_books - (activity.small_books || 0)),
+        bhagavatam: Math.max(0, (user.bhagavatam || 0) - (activity.bhagavatam || 0)),
+        chaitanya_charitamrita: Math.max(0, (user.chaitanya_charitamrita || 0) - (activity.chaitanya_charitamrita || 0)),
+        other_books: Math.max(0, (user.other_books || 0) - (activity.other_books || 0)),
+        total_money: Math.max(0, user.total_money - (activity.money_received || 0)),
+      };
+
+      await supabase
+        .from('users')
+        .update(updatedUser)
+        .eq('id', user.id);
+
+      // Update local state
+      set((state) => ({
+        users: state.users.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                hindiGita: updatedUser.hindi_gita,
+                englishGita: updatedUser.english_gita,
+                smallBooks: updatedUser.small_books,
+                bhagavatam: updatedUser.bhagavatam,
+                chaitanyaCharitamrita: updatedUser.chaitanya_charitamrita,
+                otherBooks: updatedUser.other_books,
+                totalMoney: updatedUser.total_money,
+                activities: u.activities.filter((a) => a.id !== activityId),
+              }
+            : u
+        ),
+      }));
+
+      console.log('✅ Activity deleted successfully');
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      throw error;
     }
   },
 }));

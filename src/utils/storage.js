@@ -13,9 +13,11 @@ export const uploadProfilePhoto = async (file, userId) => {
       throw new Error('File must be an image');
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error('Image size must be less than 5MB');
+    // Validate file size (max 150 KB)
+    const maxSize = 150 * 1024; // 150 KB in bytes
+    if (file.size > maxSize) {
+      const fileSizeKB = (file.size / 1024).toFixed(2);
+      throw new Error(`Image size is ${fileSizeKB} KB. Maximum allowed size is 150 KB. Please compress your image.`);
     }
 
     // Create unique filename

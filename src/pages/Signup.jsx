@@ -135,21 +135,29 @@ const Signup = () => {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      setPhoto(file);
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setPhotoPreview(reader.result);
-                      };
-                      reader.readAsDataURL(file);
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    // Validate file size (150 KB max)
+                    const maxSize = 150 * 1024; // 150 KB in bytes
+                    if (file.size > maxSize) {
+                      const fileSizeKB = (file.size / 1024).toFixed(2);
+                      setError(`Image size is ${fileSizeKB} KB. Maximum allowed size is 150 KB. Please compress your image.`);
+                      e.target.value = ''; // Clear file input
+                      return;
                     }
-                  }}
+                    setPhoto(file);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setPhotoPreview(reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
                   className="input-field text-sm"
                 />
                 <p className="text-xs text-gray-500">
-                  Max size: 5MB. Supported formats: JPG, PNG, GIF
+                  Max size: 150 KB. Supported formats: JPG, PNG, WebP
                 </p>
               </div>
             </div>

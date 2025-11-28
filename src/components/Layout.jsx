@@ -3,13 +3,17 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Layout = ({ children }) => {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
     { path: '/users', label: 'Devotees', icon: '👥' },
-    { path: '/form', label: 'Submit Form', icon: '📝' },
-    { path: '/edit-profile', label: 'Edit Profile', icon: '👤' },
+    // Only show protected routes if user is logged in
+    ...(user ? [
+      { path: '/form', label: 'Submit Form', icon: '📝' },
+      { path: '/edit-profile', label: 'Edit Profile', icon: '👤' },
+    ] : []),
+    ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: '🔐' }] : []),
   ];
 
   return (
@@ -41,7 +45,7 @@ const Layout = ({ children }) => {
                   </Link>
                 ))}
               </nav>
-              {user && (
+              {user ? (
                 <div className="flex items-center space-x-3">
                   <span className="text-sm text-gray-600 hidden sm:inline">
                     {user.email}
@@ -52,6 +56,21 @@ const Layout = ({ children }) => {
                   >
                     Logout
                   </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Link
+                    to="/login"
+                    className="px-4 py-2 text-sm bg-spiritual-600 hover:bg-spiritual-700 text-white rounded-lg transition-colors"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                  >
+                    Sign Up
+                  </Link>
                 </div>
               )}
             </div>

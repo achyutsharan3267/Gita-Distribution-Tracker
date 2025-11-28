@@ -23,8 +23,47 @@ const UserProfile = () => {
     );
   }
 
-  const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks;
+  const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
   const sortedActivities = [...user.activities].sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
+  );
+
+  // Group activities by date and merge into single entry per date
+  const activitiesByDate = sortedActivities.reduce((acc, activity) => {
+    const dateKey = activity.date;
+    if (!acc[dateKey]) {
+      acc[dateKey] = {
+        date: dateKey,
+        hindiGita: 0,
+        englishGita: 0,
+        smallBooks: 0,
+        bhagavatam: 0,
+        chaitanyaCharitamrita: 0,
+        otherBooks: 0,
+        moneyReceived: 0,
+        moneyOnline: 0,
+        moneyOffline: 0,
+        entryCount: 0,
+        activityIds: [],
+      };
+    }
+    // Merge all activities for same date
+    acc[dateKey].hindiGita += activity.hindiGita || 0;
+    acc[dateKey].englishGita += activity.englishGita || 0;
+    acc[dateKey].smallBooks += activity.smallBooks || 0;
+    acc[dateKey].bhagavatam += activity.bhagavatam || 0;
+    acc[dateKey].chaitanyaCharitamrita += activity.chaitanyaCharitamrita || 0;
+    acc[dateKey].otherBooks += activity.otherBooks || 0;
+    acc[dateKey].moneyReceived += activity.moneyReceived || 0;
+    acc[dateKey].moneyOnline += activity.moneyOnline || 0;
+    acc[dateKey].moneyOffline += activity.moneyOffline || 0;
+    acc[dateKey].entryCount += 1;
+    acc[dateKey].activityIds.push(activity.id);
+    return acc;
+  }, {});
+
+  // Convert to array and sort by date (newest first)
+  const mergedActivities = Object.values(activitiesByDate).sort(
     (a, b) => new Date(b.date) - new Date(a.date)
   );
 
@@ -85,12 +124,12 @@ const UserProfile = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="card bg-spiritual-50 border-2 border-spiritual-200">
           <div className="text-center">
-            <div className="text-4xl mb-2">📖</div>
-            <p className="text-gray-600 text-sm font-medium mb-1">Hindi Gita</p>
-            <p className="text-4xl font-bold text-spiritual-600">
+            <div className="text-3xl mb-2">📖</div>
+            <p className="text-gray-600 text-xs font-medium mb-1">Hindi Gita</p>
+            <p className="text-2xl font-bold text-spiritual-600">
               {user.hindiGita}
             </p>
           </div>
@@ -98,9 +137,9 @@ const UserProfile = () => {
 
         <div className="card bg-primary-50 border-2 border-primary-200">
           <div className="text-center">
-            <div className="text-4xl mb-2">📚</div>
-            <p className="text-gray-600 text-sm font-medium mb-1">English Gita</p>
-            <p className="text-4xl font-bold text-primary-600">
+            <div className="text-3xl mb-2">📚</div>
+            <p className="text-gray-600 text-xs font-medium mb-1">English Gita</p>
+            <p className="text-2xl font-bold text-primary-600">
               {user.englishGita}
             </p>
           </div>
@@ -108,10 +147,40 @@ const UserProfile = () => {
 
         <div className="card bg-green-50 border-2 border-green-200">
           <div className="text-center">
-            <div className="text-4xl mb-2">📗</div>
-            <p className="text-gray-600 text-sm font-medium mb-1">Small Books</p>
-            <p className="text-4xl font-bold text-green-600">
+            <div className="text-3xl mb-2">📗</div>
+            <p className="text-gray-600 text-xs font-medium mb-1">Small Books</p>
+            <p className="text-2xl font-bold text-green-600">
               {user.smallBooks}
+            </p>
+          </div>
+        </div>
+
+        <div className="card bg-indigo-50 border-2 border-indigo-200">
+          <div className="text-center">
+            <div className="text-3xl mb-2">📿</div>
+            <p className="text-gray-600 text-xs font-medium mb-1">Bhagavatam</p>
+            <p className="text-2xl font-bold text-indigo-600">
+              {user.bhagavatam || 0}
+            </p>
+          </div>
+        </div>
+
+        <div className="card bg-pink-50 border-2 border-pink-200">
+          <div className="text-center">
+            <div className="text-3xl mb-2">📿</div>
+            <p className="text-gray-600 text-xs font-medium mb-1">Chaitanya Charitamrita</p>
+            <p className="text-2xl font-bold text-pink-600">
+              {user.chaitanyaCharitamrita || 0}
+            </p>
+          </div>
+        </div>
+
+        <div className="card bg-amber-50 border-2 border-amber-200">
+          <div className="text-center">
+            <div className="text-3xl mb-2">📚</div>
+            <p className="text-gray-600 text-xs font-medium mb-1">Other Books</p>
+            <p className="text-2xl font-bold text-amber-600">
+              {user.otherBooks || 0}
             </p>
           </div>
         </div>
@@ -133,78 +202,99 @@ const UserProfile = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {sortedActivities.map((activity) => {
-              const activityTotal =
-                activity.hindiGita + activity.englishGita + activity.smallBooks;
+            {mergedActivities.map((mergedActivity) => {
+              const totalBooks = mergedActivity.hindiGita + mergedActivity.englishGita + mergedActivity.smallBooks;
+              const hasMultipleEntries = mergedActivity.entryCount > 1;
+              
               return (
                 <div
-                  key={activity.id}
+                  key={mergedActivity.date}
                   className="border border-gray-200 rounded-lg p-4 hover:bg-spiritual-50 transition-colors"
                 >
-                  <div className="flex justify-between items-start mb-3">
+                  <div className="flex justify-between items-start mb-4">
                     <div>
-                      <p className="font-semibold text-gray-800">
-                        {formatDate(activity.date)}
+                      <p className="font-semibold text-gray-800 text-lg">
+                        {formatDate(mergedActivity.date)}
                       </p>
-                      <p className="text-sm text-gray-500">
-                        Activity ID: {activity.id}
-                      </p>
+                      {hasMultipleEntries && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          {mergedActivity.entryCount} entries merged
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-spiritual-600">
-                        {activityTotal} books
+                      <p className="text-2xl font-bold text-spiritual-600">
+                        {totalBooks} books
                       </p>
-                      {activity.moneyReceived > 0 && (
+                      {mergedActivity.moneyReceived > 0 && (
                         <p className="text-sm text-gray-600">
-                          ₹{activity.moneyReceived.toLocaleString()}
+                          ₹{mergedActivity.moneyReceived.toLocaleString()}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 mb-3">
-                    <div className="bg-spiritual-50 rounded p-2">
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+                    <div className="bg-spiritual-50 rounded-lg p-2">
                       <p className="text-xs text-gray-600 mb-1">Hindi Gita</p>
-                      <p className="font-semibold text-spiritual-600">
-                        {activity.hindiGita}
+                      <p className="text-lg font-bold text-spiritual-600">
+                        {mergedActivity.hindiGita}
                       </p>
                     </div>
-                    <div className="bg-primary-50 rounded p-2">
+                    <div className="bg-primary-50 rounded-lg p-2">
                       <p className="text-xs text-gray-600 mb-1">English Gita</p>
-                      <p className="font-semibold text-primary-600">
-                        {activity.englishGita}
+                      <p className="text-lg font-bold text-primary-600">
+                        {mergedActivity.englishGita}
                       </p>
                     </div>
-                    <div className="bg-green-50 rounded p-2">
+                    <div className="bg-green-50 rounded-lg p-2">
                       <p className="text-xs text-gray-600 mb-1">Small Books</p>
-                      <p className="font-semibold text-green-600">
-                        {activity.smallBooks}
+                      <p className="text-lg font-bold text-green-600">
+                        {mergedActivity.smallBooks}
+                      </p>
+                    </div>
+                    <div className="bg-indigo-50 rounded-lg p-2">
+                      <p className="text-xs text-gray-600 mb-1">Bhagavatam</p>
+                      <p className="text-lg font-bold text-indigo-600">
+                        {mergedActivity.bhagavatam || 0}
+                      </p>
+                    </div>
+                    <div className="bg-pink-50 rounded-lg p-2">
+                      <p className="text-xs text-gray-600 mb-1">Chaitanya Charitamrita</p>
+                      <p className="text-lg font-bold text-pink-600">
+                        {mergedActivity.chaitanyaCharitamrita || 0}
+                      </p>
+                    </div>
+                    <div className="bg-amber-50 rounded-lg p-2">
+                      <p className="text-xs text-gray-600 mb-1">Other Books</p>
+                      <p className="text-lg font-bold text-amber-600">
+                        {mergedActivity.otherBooks || 0}
                       </p>
                     </div>
                   </div>
 
-                  {activity.moneyReceived > 0 && (
-                    <div className="border-t pt-3 mt-3">
-                      <p className="text-sm font-medium text-gray-700 mb-2">
+                  {mergedActivity.moneyReceived > 0 && (
+                    <div className="border-t pt-4 mt-4">
+                      <p className="text-sm font-medium text-gray-700 mb-3">
                         Money Details:
                       </p>
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <div>
-                          <p className="text-gray-600">Total Received</p>
-                          <p className="font-semibold">
-                            ₹{activity.moneyReceived.toLocaleString()}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-purple-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 mb-1">Total Received</p>
+                          <p className="font-bold text-purple-600">
+                            ₹{mergedActivity.moneyReceived.toLocaleString()}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Online</p>
-                          <p className="font-semibold">
-                            ₹{activity.moneyOnline.toLocaleString()}
+                        <div className="bg-blue-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 mb-1">Online</p>
+                          <p className="font-bold text-blue-600">
+                            ₹{mergedActivity.moneyOnline.toLocaleString()}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Offline</p>
-                          <p className="font-semibold">
-                            ₹{activity.moneyOffline.toLocaleString()}
+                        <div className="bg-orange-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-600 mb-1">Offline</p>
+                          <p className="font-bold text-orange-600">
+                            ₹{mergedActivity.moneyOffline.toLocaleString()}
                           </p>
                         </div>
                       </div>

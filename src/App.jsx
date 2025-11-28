@@ -4,11 +4,13 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useStore } from './store/useStore';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import Dashboard from './pages/Dashboard';
 import UserList from './pages/UserList';
 import UserProfile from './pages/UserProfile';
 import DistributionForm from './pages/DistributionForm';
 import EditProfile from './pages/EditProfile';
+import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
@@ -142,11 +144,14 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute><UserList /></ProtectedRoute>} />
-          <Route path="/user/:userId" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+          {/* Public routes - no login required */}
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/users" element={<UserList />} />
+          <Route path="/user/:userId" element={<UserProfile />} />
+          {/* Protected routes - login required */}
           <Route path="/form" element={<ProtectedRoute><DistributionForm /></ProtectedRoute>} />
           <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         </Routes>
       </Layout>
     </Router>
