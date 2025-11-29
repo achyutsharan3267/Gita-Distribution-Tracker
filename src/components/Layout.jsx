@@ -14,10 +14,6 @@ const Layout = ({ children }) => {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
     { path: '/users', label: 'Devotees', icon: '👥' },
-    // Only show protected routes if user is logged in
-    ...(user ? [
-      { path: '/form', label: 'Submit Form', icon: '📝' },
-    ] : []),
     ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: '🔐' }] : []),
   ];
 
@@ -123,6 +119,14 @@ const Layout = ({ children }) => {
                         >
                           <span className="mr-3">👤</span>
                           Edit Profile
+                        </Link>
+                        <Link
+                          to="/form"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-spiritual-50 transition-colors"
+                        >
+                          <span className="mr-3">📝</span>
+                          Submit Daily Distribution
                         </Link>
                         {currentUserProfile && (
                           <Link

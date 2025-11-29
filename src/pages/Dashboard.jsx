@@ -1,27 +1,24 @@
 import { useStore } from '../store/useStore';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const totalStats = useStore((state) => state.getTotalStats());
   const leaderboard = useStore((state) => state.getLeaderboard());
   const activeDevotees = useStore((state) => state.getActiveDevotees());
+  const navigate = useNavigate();
 
   // Filter out users with 0 total books
   const activeLeaderboard = leaderboard.filter((user) => user.totalDistributed > 0);
   const top3 = activeLeaderboard.slice(0, 3);
   const top10 = activeLeaderboard.slice(0, 10);
 
-  const StatCard = ({ title, value, icon, color }) => (
-    <div className="card p-3 sm:p-4 md:p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-gray-600 text-xs sm:text-sm font-medium truncate">{title}</p>
-          <p className={`text-xl sm:text-2xl md:text-3xl font-bold mt-1 sm:mt-2 ${color}`}>{value.toLocaleString()}</p>
-        </div>
-        <div className={`text-2xl sm:text-3xl md:text-4xl ${color} flex-shrink-0 ml-2`}>{icon}</div>
-      </div>
-    </div>
-  );
+  // Calculate total books
+  const totalBooks = totalStats.hindiGita + 
+    totalStats.englishGita + 
+    totalStats.smallBooks + 
+    (totalStats.bhagavatam || 0) + 
+    (totalStats.chaitanyaCharitamrita || 0) + 
+    (totalStats.otherBooks || 0);
 
   return (
     <div className="space-y-4 sm:space-y-6 md:space-y-8">
@@ -33,32 +30,23 @@ const Dashboard = () => {
         <p className="text-sm sm:text-base text-gray-600 px-2">Track the divine service of book distribution</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-        <StatCard
-          title="Hindi Gita Distributed"
-          value={totalStats.hindiGita}
-          icon="📖"
-          color="text-spiritual-600"
-        />
-        <StatCard
-          title="English Gita Distributed"
-          value={totalStats.englishGita}
-          icon="📚"
-          color="text-primary-600"
-        />
-        <StatCard
-          title="Small Books Distributed"
-          value={totalStats.smallBooks}
-          icon="📗"
-          color="text-green-600"
-        />
-        <StatCard
-          title="Total Distribution Count"
-          value={totalStats.hindiGita + totalStats.englishGita + totalStats.smallBooks + (totalStats.bhagavatam || 0) + (totalStats.chaitanyaCharitamrita || 0) + (totalStats.otherBooks || 0)}
-          icon="📊"
-          color="text-purple-600"
-        />
+      {/* Total Books Count Card - Clickable */}
+      <div 
+        onClick={() => navigate('/books')}
+        className="card p-4 sm:p-6 cursor-pointer hover:shadow-xl transition-all duration-200 bg-gradient-to-br from-spiritual-50 to-primary-50 border border-spiritual-200"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <p className="text-gray-600 text-xs sm:text-sm font-medium mb-1">Total Books Distributed</p>
+            <p className="text-3xl sm:text-4xl md:text-5xl font-bold mt-2 text-spiritual-600">
+              {totalBooks.toLocaleString()}
+            </p>
+            <p className="text-xs sm:text-sm text-gray-500 mt-2">
+              Click to view detailed breakdown →
+            </p>
+          </div>
+          <div className="text-5xl sm:text-6xl md:text-7xl flex-shrink-0 ml-4">📚</div>
+        </div>
       </div>
 
       {/* Active Devotees Count */}
@@ -79,7 +67,7 @@ const Dashboard = () => {
       <div className="card p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
           <span className="mr-2">🏆</span>
-          Top 3 Distributor
+          Top 3 Distributors
         </h2>
         {top3.length === 0 ? (
           <div className="text-center py-8 sm:py-12">
@@ -107,6 +95,9 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-1 truncate px-2">{user.name}</h3>
+                <p className="text-gray-600 text-xs sm:text-sm mb-1 truncate px-2">
+                  🏛️ {user.other || 'Other'}
+                </p>
                 {user.city && (
                   <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 truncate px-2">📍 {user.city}</p>
                 )}
@@ -138,6 +129,7 @@ const Dashboard = () => {
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">#</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Rank</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[120px]">Devotee</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[100px]">Bace</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Hindi</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">English</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Small</th>
@@ -150,7 +142,7 @@ const Dashboard = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {top10.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="py-8 sm:py-12 text-center">
+                    <td colSpan="11" className="py-8 sm:py-12 text-center">
                       <p className="text-gray-500 text-base sm:text-lg">No Devotees found</p>
                     </td>
                   </tr>
@@ -202,6 +194,9 @@ const Dashboard = () => {
                         </div>
                       </Link>
                     </td>
+                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-left font-medium text-sm sm:text-base whitespace-nowrap min-w-[100px]">
+                      <span className="text-gray-800">🏛️ {user.other || 'Other'}</span>
+                    </td>
                     <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.hindiGita}</td>
                     <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.englishGita}</td>
                     <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.smallBooks}</td>
@@ -223,12 +218,6 @@ const Dashboard = () => {
 
       {/* Quick Actions */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-        <Link
-          to="/form"
-          className="btn-primary text-center text-base sm:text-lg py-2.5 sm:py-3"
-        >
-          📝 Submit Daily Distribution
-        </Link>
         <Link
           to="/users"
           className="btn-secondary text-center text-base sm:text-lg py-2.5 sm:py-3"

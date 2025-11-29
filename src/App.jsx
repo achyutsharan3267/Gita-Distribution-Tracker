@@ -13,6 +13,7 @@ import UserProfile from './pages/UserProfile';
 import DistributionForm from './pages/DistributionForm';
 import EditProfile from './pages/EditProfile';
 import AdminDashboard from './pages/AdminDashboard';
+import BookBreakdown from './pages/BookBreakdown';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
@@ -138,10 +139,11 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          {/* Public routes - no login required */}
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/users" element={<UserList />} />
-          <Route path="/user/:userId" element={<UserProfile />} />
+                  {/* Public routes - no login required */}
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/users" element={<UserList />} />
+                  <Route path="/user/:userId" element={<UserProfile />} />
+                  <Route path="/books" element={<BookBreakdown />} />
           {/* Protected routes - login required */}
           <Route path="/form" element={<ProtectedRoute><DistributionForm /></ProtectedRoute>} />
           <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />

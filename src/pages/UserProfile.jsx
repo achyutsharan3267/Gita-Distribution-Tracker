@@ -106,14 +106,15 @@ const UserProfile = () => {
           />
           <div className="flex-1 text-center md:text-left w-full">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words">{user.name}</h1>
-            <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
-              {user.city && (
-                <p className="text-base sm:text-lg md:text-xl text-spiritual-100 break-words">📍 {user.city}</p>
-              )}
-              {user.mobileNumber && (
-                <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">📱 {user.mobileNumber}</p>
-              )}
-            </div>
+                    <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
+                      {user.city && (
+                        <p className="text-base sm:text-lg md:text-xl text-spiritual-100 break-words">📍 {user.city}</p>
+                      )}
+                      {user.mobileNumber && (
+                        <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">📱 {user.mobileNumber}</p>
+                      )}
+                      <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">🏛️ {user.other || 'Other'}</p>
+                    </div>
             <div className="flex flex-wrap gap-3 sm:gap-4 justify-center md:justify-start">
               <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2">
                 <p className="text-xs sm:text-sm text-spiritual-100">Total Books</p>
@@ -209,7 +210,12 @@ const UserProfile = () => {
         ) : (
           <div className="space-y-4">
             {mergedActivities.map((mergedActivity) => {
-              const totalBooks = mergedActivity.hindiGita + mergedActivity.englishGita + mergedActivity.smallBooks;
+              const totalBooks = mergedActivity.hindiGita + 
+                mergedActivity.englishGita + 
+                mergedActivity.smallBooks + 
+                (mergedActivity.bhagavatam || 0) + 
+                (mergedActivity.chaitanyaCharitamrita || 0) + 
+                (mergedActivity.otherBooks || 0);
               const hasMultipleEntries = mergedActivity.entryCount > 1;
               
               return (
@@ -317,9 +323,6 @@ const UserProfile = () => {
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
         <Link to="/form" className="btn-primary text-center text-base sm:text-lg py-2.5 sm:py-3">
           📝 Submit New Distribution
-        </Link>
-        <Link to="/" className="btn-secondary text-center text-base sm:text-lg py-2.5 sm:py-3">
-          🏠 Back to Dashboard
         </Link>
       </div>
     </div>

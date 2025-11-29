@@ -9,6 +9,7 @@ const UserList = () => {
   const leaderboard = useStore((state) => state.getLeaderboard());
   const { user: authUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
 
   // Filter users based on search query (name, mobile number, email)
   const filteredLeaderboard = useMemo(() => {
@@ -35,6 +36,7 @@ const UserList = () => {
         'Name': user.name || '',
         'Email': user.email || '',
         'Mobile Number': user.mobileNumber || '',
+        'Bace': user.other || 'Other',
         'City': user.city || '',
         'Hindi Gita': user.hindiGita || 0,
         'English Gita': user.englishGita || 0,
@@ -57,6 +59,7 @@ const UserList = () => {
       { wch: 20 }, // Name
       { wch: 25 }, // Email
       { wch: 15 }, // Mobile Number
+      { wch: 15 }, // Bace
       { wch: 15 }, // City
       { wch: 12 }, // Hindi Gita
       { wch: 13 }, // English Gita
@@ -89,7 +92,7 @@ const UserList = () => {
         </p>
       </div>
 
-      {/* Search Bar and Export Button */}
+      {/* Search Bar, View Toggle, and Export Button */}
       <div className="card p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
           <div className="flex-1 w-full">
@@ -111,7 +114,38 @@ const UserList = () => {
               </svg>
             </div>
           </div>
-          <div className="flex gap-2 sm:gap-3">
+          <div className="flex gap-2 sm:gap-3 items-center">
+            {/* View Toggle Buttons */}
+            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm transition-colors flex items-center gap-1 ${
+                  viewMode === 'grid'
+                    ? 'bg-spiritual-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+                title="Grid View"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+                <span className="hidden sm:inline">Grid</span>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm transition-colors flex items-center gap-1 border-l border-gray-300 ${
+                  viewMode === 'list'
+                    ? 'bg-spiritual-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+                title="List View"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                <span className="hidden sm:inline">List</span>
+              </button>
+            </div>
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
@@ -128,7 +162,8 @@ const UserList = () => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Export to Excel
+                <span className="hidden sm:inline">Export to Excel</span>
+                <span className="sm:hidden">Export</span>
               </button>
             )}
           </div>
@@ -158,7 +193,7 @@ const UserList = () => {
             Clear Search
           </button>
         </div>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredLeaderboard.map((user) => {
             const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
@@ -173,21 +208,25 @@ const UserList = () => {
                     <img
                       src={user.photo}
                       alt={user.name}
-                      className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors flex-shrink-0"
+                      className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors flex-shrink-0 object-cover"
                     />
                     <div className="flex-1 min-w-0">
                     <h3 className="text-lg sm:text-xl font-bold text-gray-800 group-hover:text-spiritual-600 transition-colors truncate">
                       {user.name}
                     </h3>
                     <div className="space-y-0.5 sm:space-y-1">
-                      {user.city && (
+                      <p className="text-gray-600 text-xs sm:text-sm truncate">🏛️ {user.other || 'Other'}</p>
+                      {user.mobileNumber && (
+                        <p className="text-gray-600 text-xs sm:text-sm truncate">📱 {user.mobileNumber} {user.city && `• ${user.city}`}</p>
+                      )}
+                      {!user.mobileNumber && user.city && (
                         <p className="text-gray-600 text-xs sm:text-sm truncate">📍 {user.city}</p>
                       )}
-                      {user.mobileNumber && (
-                        <p className="text-gray-600 text-xs sm:text-sm truncate">📱 {user.mobileNumber}</p>
-                      )}
                     </div>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -202,6 +241,18 @@ const UserList = () => {
                     <div className="bg-green-50 rounded-lg p-2 sm:p-3 text-center">
                       <p className="text-base sm:text-lg font-bold text-green-600">{user.smallBooks}</p>
                       <p className="text-xs text-gray-600">Small Books</p>
+                    </div>
+                    <div className="bg-yellow-50 rounded-lg p-2 sm:p-3 text-center">
+                      <p className="text-base sm:text-lg font-bold text-yellow-600">{user.bhagavatam || 0}</p>
+                      <p className="text-xs text-gray-600">Bhagavatam</p>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-2 sm:p-3 text-center">
+                      <p className="text-base sm:text-lg font-bold text-purple-600">{user.chaitanyaCharitamrita || 0}</p>
+                      <p className="text-xs text-gray-600">Chaitanya</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-2 sm:p-3 text-center">
+                      <p className="text-base sm:text-lg font-bold text-blue-600">{user.otherBooks || 0}</p>
+                      <p className="text-xs text-gray-600">Other Books</p>
                     </div>
                   </div>
 
@@ -231,6 +282,104 @@ const UserList = () => {
               </Link>
             );
           })}
+        </div>
+      ) : (
+        <div className="card p-4 sm:p-6">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-[950px] sm:min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">#</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Rank</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[120px]">Devotee</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[100px]">Bace</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Hindi</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">English</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Small</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Bhagavatam</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Chaitanya</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Other</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Total</th>
+                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Money</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredLeaderboard.map((user, index) => {
+                    const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+                    return (
+                      <tr
+                        key={user.id}
+                        className="border-b border-gray-100 hover:bg-spiritual-50 transition-colors"
+                      >
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                          <Link
+                            to={`/user/${user.id}`}
+                            className="flex justify-center group"
+                          >
+                            <img
+                              src={user.photo}
+                              alt={user.name}
+                              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors flex-shrink-0 object-cover"
+                            />
+                          </Link>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                          <span
+                            className={`inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full font-bold text-xs sm:text-sm ${
+                              index === 0
+                                ? 'bg-yellow-400 text-yellow-900'
+                                : index === 1
+                                ? 'bg-gray-300 text-gray-800'
+                                : index === 2
+                                ? 'bg-orange-300 text-orange-900'
+                                : 'bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            {index + 1}
+                          </span>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap min-w-[120px]">
+                          <Link
+                            to={`/user/${user.id}`}
+                            className="group"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
+                                {user.name}
+                              </p>
+                              {user.mobileNumber && (
+                                <p className="text-xs text-gray-500 truncate">📱 {user.mobileNumber} {user.city && `• ${user.city}`}</p>
+                              )}
+                              {!user.mobileNumber && user.city && (
+                                <p className="text-xs text-gray-500 truncate">📍 {user.city}</p>
+                              )}
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-left font-medium text-sm sm:text-base whitespace-nowrap min-w-[100px]">
+                          <span className="text-gray-800">🏛️ {user.other || 'Other'}</span>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.hindiGita}</td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.englishGita}</td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.smallBooks}</td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.bhagavatam || 0}</td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.chaitanyaCharitamrita || 0}</td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.otherBooks || 0}</td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-bold text-sm sm:text-base text-spiritual-600 whitespace-nowrap">
+                          {totalDistributed}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base text-purple-600 whitespace-nowrap">
+                          ₹{user.totalMoney.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-gray-500 mt-2 sm:hidden text-center">← Swipe to see all columns →</p>
+          </div>
         </div>
       )}
     </div>

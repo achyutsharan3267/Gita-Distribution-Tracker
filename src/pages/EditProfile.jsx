@@ -17,6 +17,7 @@ const EditProfile = () => {
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [other, setOther] = useState('');
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [error, setError] = useState('');
@@ -56,6 +57,7 @@ const EditProfile = () => {
       setName(currentUserProfile.name || '');
       setCity(currentUserProfile.city || '');
       setMobileNumber(currentUserProfile.mobileNumber || '');
+      setOther(currentUserProfile.other || '');
       setPhotoPreview(currentUserProfile.photo || null);
     }
   }, [currentUserProfile]);
@@ -129,6 +131,7 @@ const EditProfile = () => {
           name: name.trim(),
           city: city.trim() || null,
           mobile_number: mobileNumber.trim() || null,
+          other: other || null,
           photo: photoUrl,
         })
         .eq('id', currentUserProfile.id);
@@ -259,6 +262,26 @@ const EditProfile = () => {
           />
           <p className="text-xs text-gray-500 mt-1">
             Enter your mobile/phone number
+          </p>
+        </div>
+
+        {/* Bace */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Bace *
+          </label>
+          <select
+            value={other}
+            onChange={(e) => setOther(e.target.value)}
+            className="input-field"
+          >
+            <option value="" disabled>Select your bace</option>
+            <option value="Mayapur Dham">Mayapur Dham</option>
+            <option value="Govind Dham">Govind Dham</option>
+            <option value="Other">Other</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Select your bace (Required)
           </p>
         </div>
 

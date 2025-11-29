@@ -11,6 +11,7 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [city, setCity] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [other, setOther] = useState('');
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [error, setError] = useState('');
@@ -30,6 +31,11 @@ const Signup = () => {
 
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!other) {
+      setError('Please select your Bace location');
       return;
     }
 
@@ -62,6 +68,7 @@ const Signup = () => {
         name,
         city: city || null,
         mobileNumber: mobileNumber.trim() || null,
+        other: other || null,
         photo: photoUrl,
         hindiGita: 0,
         englishGita: 0,
@@ -134,6 +141,26 @@ const Signup = () => {
               />
               <p className="text-xs text-gray-500 mt-1">
                 Enter your mobile/phone number
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bace *
+              </label>
+              <select
+                value={other}
+                onChange={(e) => setOther(e.target.value)}
+                className="input-field"
+                required
+              >
+                <option value="" disabled>Select your bace</option>
+                <option value="Mayapur Dham">Mayapur Dham</option>
+                <option value="Govind Dham">Govind Dham</option>
+                <option value="Other">Other</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select your bace (Required)
               </p>
             </div>
 
