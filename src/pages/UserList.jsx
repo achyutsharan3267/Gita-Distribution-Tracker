@@ -2,12 +2,14 @@ import { Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { formatMobileNumber } from '../utils/maskMobileNumber';
 import * as XLSX from 'xlsx';
 
 const UserList = () => {
   const users = useStore((state) => state.users);
   const leaderboard = useStore((state) => state.getLeaderboard());
-  const { user: authUser } = useAuth();
+  const { user: authUser, isAdmin } = useAuth();
+  const currentUserProfile = useStore((state) => state.currentUserProfile);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
 
@@ -154,7 +156,7 @@ const UserList = () => {
                 Clear
               </button>
             )}
-            {filteredLeaderboard.length > 0 && (
+            {filteredLeaderboard.length > 0 && isAdmin && (
               <button
                 onClick={exportToExcel}
                 className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
@@ -217,7 +219,7 @@ const UserList = () => {
                     <div className="space-y-0.5 sm:space-y-1">
                       <p className="text-gray-600 text-xs sm:text-sm truncate">🏛️ {user.other || 'Other'}</p>
                       {user.mobileNumber && (
-                        <p className="text-gray-600 text-xs sm:text-sm truncate">📱 {user.mobileNumber} {user.city && `• ${user.city}`}</p>
+                        <p className="text-gray-600 text-xs sm:text-sm truncate">📱 {formatMobileNumber(user.mobileNumber, isAdmin, currentUserProfile?.id === user.id)} {user.city && `• ${user.city}`}</p>
                       )}
                       {!user.mobileNumber && user.city && (
                         <p className="text-gray-600 text-xs sm:text-sm truncate">📍 {user.city}</p>
@@ -349,7 +351,7 @@ const UserList = () => {
                                         {user.name}
                                       </p>
                               {user.mobileNumber && (
-                                <p className="text-xs text-gray-500 truncate">📱 {user.mobileNumber} {user.city && `• ${user.city}`}</p>
+                                <p className="text-xs text-gray-500 truncate">📱 {formatMobileNumber(user.mobileNumber, isAdmin, currentUserProfile?.id === user.id)} {user.city && `• ${user.city}`}</p>
                               )}
                               {!user.mobileNumber && user.city && (
                                 <p className="text-xs text-gray-500 truncate">📍 {user.city}</p>

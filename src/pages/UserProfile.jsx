@@ -1,11 +1,12 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../contexts/AuthContext';
+import { formatMobileNumber } from '../utils/maskMobileNumber';
 
 const UserProfile = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, isAdmin } = useAuth();
   const users = useStore((state) => state.users);
   const currentUserProfile = useStore((state) => state.currentUserProfile);
   const user = users.find((u) => u.id === userId);
@@ -124,7 +125,7 @@ const UserProfile = () => {
                         <p className="text-base sm:text-lg md:text-xl text-spiritual-100 break-words">📍 {user.city}</p>
                       )}
                       {user.mobileNumber && (
-                        <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">📱 {user.mobileNumber}</p>
+                        <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">📱 {formatMobileNumber(user.mobileNumber, isAdmin, isOwnProfile)}</p>
                       )}
                       <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">🏛️ {user.other || 'Other'}</p>
                     </div>

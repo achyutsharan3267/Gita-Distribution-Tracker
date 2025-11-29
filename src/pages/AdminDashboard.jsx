@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
@@ -21,6 +22,8 @@ const AdminDashboard = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
   const [showEditActivityModal, setShowEditActivityModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [editData, setEditData] = useState({});
@@ -28,23 +31,24 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
-      return;
-    }
+  const handleDeleteClick = (userId, userName) => {
+    const user = users.find(u => u.id === userId);
+    setUserToDelete({ id: userId, name: userName, user });
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
       setLoading(true);
+      setShowDeleteModal(false);
       
       // Check if deleting the currently logged in user
-      const userToDelete = users.find(u => u.id === userId);
-      // Get auth_user_id from the user object (we need to check if it's stored)
-      // Since users don't have auth_user_id in the transformed object, we need to check differently
-      // We'll check by comparing currentUserProfile with the user being deleted
       const currentUserProfile = useStore.getState().currentUserProfile;
-      const isDeletingSelf = currentUserProfile?.id === userId;
+      const isDeletingSelf = currentUserProfile?.id === userToDelete.id;
       
-      await deleteUser(userId, currentAuthUser?.id);
+      await deleteUser(userToDelete.id, currentAuthUser?.id);
       
       // If deleting self, sign out and redirect
       if (isDeletingSelf) {
@@ -61,12 +65,15 @@ const AdminDashboard = () => {
           autoClose: 3000,
         });
       }
+      
+      setUserToDelete(null);
     } catch (err) {
       setError(err.message);
       toast.error(`Error: ${err.message}`, {
         position: "top-right",
         autoClose: 4000,
       });
+      setUserToDelete(null);
     } finally {
       setLoading(false);
     }
@@ -78,19 +85,50 @@ const AdminDashboard = () => {
       return;
     }
 
+    if (!selectedUser) {
+      setError('No user selected');
+      return;
+    }
+
     try {
       setLoading(true);
-      // Note: This requires Supabase Admin API or a database function
-      // For now, we'll show a message
-      toast.info('Password update requires Supabase Admin API. Please use Supabase Dashboard to update passwords.', {
+      setError('');
+      
+      // Get the user's auth_user_id from database
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('auth_user_id')
+        .eq('id', selectedUser.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (!userData?.auth_user_id) {
+        throw new Error('User authentication ID not found');
+      }
+
+      // Call database function to reset password
+      const { error: resetError } = await supabase.rpc('reset_user_password', {
+        user_auth_id: userData.auth_user_id,
+        new_password: newPassword
+      });
+
+      if (resetError) {
+        // If RPC function doesn't work, provide helpful error message
+        console.error('Password reset error:', resetError);
+        throw new Error(`Password reset failed: ${resetError.message}. Please ensure the database function is set up correctly. See database/reset_user_password_function.sql`);
+      }
+
+      toast.success(`Password reset successfully for ${selectedUser.name}`, {
         position: "top-right",
-        autoClose: 4000,
+        autoClose: 3000,
       });
       setShowPasswordModal(false);
       setNewPassword('');
+      setSelectedUser(null);
     } catch (err) {
-      setError(err.message);
-      toast.error(`Error: ${err.message}`, {
+      setError(err.message || 'Failed to reset password');
+      toast.error(`Error: ${err.message || 'Failed to reset password'}`, {
         position: "top-right",
         autoClose: 4000,
       });
@@ -372,7 +410,7 @@ const AdminDashboard = () => {
                               👁️
                             </Link>
                             <button
-                              onClick={() => handleDeleteUser(user.id, user.name)}
+                              onClick={() => handleDeleteClick(user.id, user.name)}
                               className="text-red-600 hover:text-red-800 font-medium"
                               disabled={loading}
                               title="Delete User"
@@ -425,9 +463,13 @@ const AdminDashboard = () => {
                 Cancel
               </button>
             </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg mb-3 sm:mb-4 text-xs sm:text-sm">
+                {error}
+              </div>
+            )}
             <p className="text-xs text-gray-500 mt-3 sm:mt-4">
-              Note: Password updates require Supabase Admin API access. 
-              Use Supabase Dashboard for password changes.
+              Password must be at least 6 characters long.
             </p>
           </div>
         </div>
@@ -770,6 +812,47 @@ const AdminDashboard = () => {
                   setSelectedActivity(null);
                 }}
                 className="btn-secondary flex-1 text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {showDeleteModal && userToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">⚠️</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Delete User?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+              Are you sure you want to delete <span className="font-semibold text-gray-800">{userToDelete.name}</span>?
+            </p>
+            <p className="text-xs sm:text-sm text-red-600 text-center mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
+              ⚠️ This action cannot be undone. All user data including activities will be permanently deleted.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleDeleteUser}
+                disabled={loading}
+                className="btn-primary bg-red-600 hover:bg-red-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Deleting...' : 'Yes, Delete User'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setUserToDelete(null);
+                }}
+                disabled={loading}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
               >
                 Cancel
               </button>
