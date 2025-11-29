@@ -14,6 +14,7 @@ import DistributionForm from './pages/DistributionForm';
 import EditProfile from './pages/EditProfile';
 import AdminDashboard from './pages/AdminDashboard';
 import BookBreakdown from './pages/BookBreakdown';
+import BooksAndPrices from './pages/BooksAndPrices';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
@@ -144,6 +145,7 @@ function AppContent() {
                   <Route path="/users" element={<UserList />} />
                   <Route path="/user/:userId" element={<UserProfile />} />
                   <Route path="/books" element={<BookBreakdown />} />
+                  <Route path="/books-prices" element={<BooksAndPrices />} />
           {/* Protected routes - login required */}
           <Route path="/form" element={<ProtectedRoute><DistributionForm /></ProtectedRoute>} />
           <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />

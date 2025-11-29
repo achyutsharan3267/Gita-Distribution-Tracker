@@ -76,6 +76,7 @@ export const useStore = create((set, get) => ({
   loading: true,
   error: null,
   realtimeSubscriptions: null, // Store subscription references
+  books: [], // Books from database
 
   // Get authenticated user's profile
   getCurrentUserProfile: async (authUserId) => {
@@ -126,10 +127,37 @@ export const useStore = create((set, get) => ({
         }
       }
 
-      return {
+      const transformedUser = {
         ...transformUser(data),
         isAdmin,
       };
+      
+      // Load book distributions for this user
+      try {
+        const { data: bdData, error: bdError } = await supabase
+          .from('book_distributions')
+          .select('book_id, count')
+          .eq('user_id', transformedUser.id);
+        
+        if (!bdError && bdData) {
+          // Aggregate book distributions by book_id
+          const bookDistributions = {};
+          bdData.forEach((bd) => {
+            if (!bookDistributions[bd.book_id]) {
+              bookDistributions[bd.book_id] = 0;
+            }
+            bookDistributions[bd.book_id] += bd.count || 0;
+          });
+          transformedUser.bookDistributions = bookDistributions;
+        } else {
+          transformedUser.bookDistributions = {};
+        }
+      } catch (err) {
+        console.warn('Could not load book distributions for current user:', err);
+        transformedUser.bookDistributions = {};
+      }
+      
+      return transformedUser;
     } catch (error) {
       console.error('Error fetching current user profile:', error);
       return null;
@@ -146,7 +174,42 @@ export const useStore = create((set, get) => ({
         .order('date', { ascending: false });
 
       if (error) throw error;
-      return data?.map(transformActivity) || [];
+      
+      const activities = data?.map(transformActivity) || [];
+      
+      // Load book distributions for this user's activities
+      const activityIds = activities.map(a => a.id);
+      if (activityIds.length > 0) {
+        let bookDistributions = null;
+        let bdError = null;
+        try {
+          const result = await supabase
+            .from('book_distributions')
+            .select('*')
+            .in('activity_id', activityIds);
+          bookDistributions = result.data;
+          bdError = result.error;
+        } catch (err) {
+          // If table doesn't exist, continue without book distributions
+          console.warn('Could not fetch book distributions (table may not exist):', err.message);
+          bookDistributions = null;
+          bdError = err;
+        }
+
+        if (!bdError && bookDistributions) {
+          // Attach book distributions to activities
+          activities.forEach(activity => {
+            activity.bookDistributions = {};
+            bookDistributions
+              .filter(bd => bd.activity_id === activity.id)
+              .forEach(bd => {
+                activity.bookDistributions[bd.book_id] = (activity.bookDistributions[bd.book_id] || 0) + (bd.count || 0);
+              });
+          });
+        }
+      }
+      
+      return activities;
     } catch (error) {
       console.error('Error loading activities:', error);
       return [];
@@ -238,6 +301,41 @@ export const useStore = create((set, get) => ({
       
       console.log(`Loaded ${activities?.length || 0} activities`);
 
+      // Fetch book_distributions for all users
+      console.log('Fetching book distributions from database...');
+      let bookDistributions = null;
+      let bdError = null;
+      try {
+        const result = await supabase
+          .from('book_distributions')
+          .select('*');
+        bookDistributions = result.data;
+        bdError = result.error;
+      } catch (err) {
+        // If table doesn't exist, continue without book distributions
+        console.warn('Could not fetch book distributions (table may not exist):', err.message);
+        bookDistributions = null;
+        bdError = err;
+      }
+
+      if (bdError && !bdError.message?.includes('does not exist')) {
+        console.warn('Error fetching book distributions:', bdError);
+      }
+
+      console.log(`Loaded ${bookDistributions?.length || 0} book distributions`);
+
+      // Aggregate book distributions by user_id and book_id
+      const bookDistributionsByUser = {};
+      bookDistributions?.forEach((bd) => {
+        if (!bookDistributionsByUser[bd.user_id]) {
+          bookDistributionsByUser[bd.user_id] = {};
+        }
+        if (!bookDistributionsByUser[bd.user_id][bd.book_id]) {
+          bookDistributionsByUser[bd.user_id][bd.book_id] = 0;
+        }
+        bookDistributionsByUser[bd.user_id][bd.book_id] += bd.count || 0;
+      });
+
       // Group activities by user_id
       const activitiesByUser = {};
       activities?.forEach((activity) => {
@@ -286,17 +384,24 @@ export const useStore = create((set, get) => ({
         console.error('Admin status fetch error:', err);
       }
 
-      // Transform users and attach activities and admin status
+      // Transform users and attach activities, book distributions, and admin status
       const transformedUsers = users?.map((user) => {
         const isAdmin = adminMap[user.auth_user_id] || false;
         if (isAdmin) {
           console.log('Admin found:', user.name, user.auth_user_id);
         }
-        return {
-          ...transformUser(user),
-          activities: activitiesByUser[user.id] || [],
-          isAdmin,
-        };
+        const transformedUser = transformUser(user);
+        transformedUser.activities = activitiesByUser[user.id] || [];
+        transformedUser.isAdmin = isAdmin;
+        
+        // Add book distributions to user object (for dynamic books)
+        if (bookDistributionsByUser[user.id]) {
+          transformedUser.bookDistributions = bookDistributionsByUser[user.id];
+        } else {
+          transformedUser.bookDistributions = {};
+        }
+        
+        return transformedUser;
       }) || [];
 
       // Get authenticated user's profile if authUserId provided
@@ -308,6 +413,14 @@ export const useStore = create((set, get) => ({
         if (currentUserProfile) {
           // Load activities for current user
           currentUserProfile.activities = await get().loadUserActivities(currentUserProfile.id);
+          
+          // Add book distributions to current user profile (for dynamic books)
+          if (bookDistributionsByUser[currentUserProfile.id]) {
+            currentUserProfile.bookDistributions = bookDistributionsByUser[currentUserProfile.id];
+          } else {
+            currentUserProfile.bookDistributions = {};
+          }
+          
           currentUserId = currentUserProfile.id;
         }
       }
@@ -430,6 +543,10 @@ export const useStore = create((set, get) => ({
       const newOtherBooks = (user.otherBooks || 0) + (distribution.otherBooks || 0);
       const newTotalMoney = user.totalMoney + (distribution.moneyReceived || 0);
 
+      // Calculate totals for new books (from book_distributions)
+      // This will be handled separately in the book_distributions table
+      // For now, we'll just save them to the table
+
       // Update user totals in database
       const { error: updateError } = await supabase
         .from('users')
@@ -469,8 +586,68 @@ export const useStore = create((set, get) => ({
 
       if (activityError) throw activityError;
 
+      // Save ALL books (standard and new) to book_distributions table
+      // This allows dynamic book management - admin can add/delete books anytime
+      const bookDistributions = [];
+      
+      // Add standard books
+      const standardBooks = [
+        { bookId: 'hindiGita', count: distribution.hindiGita || 0 },
+        { bookId: 'englishGita', count: distribution.englishGita || 0 },
+        { bookId: 'smallBooks', count: distribution.smallBooks || 0 },
+        { bookId: 'bhagavatam', count: distribution.bhagavatam || 0 },
+        { bookId: 'chaitanyaCharitamrita', count: distribution.chaitanyaCharitamrita || 0 },
+        { bookId: 'otherBooks', count: distribution.otherBooks || 0 },
+      ];
+      
+      standardBooks.forEach(book => {
+        if (book.count > 0) {
+          bookDistributions.push({
+            activity_id: activityData.id,
+            user_id: userId,
+            book_id: book.bookId,
+            count: book.count,
+          });
+        }
+      });
+      
+      // Add new books (not in standard mapping)
+      if (distribution.newBooks && Array.isArray(distribution.newBooks)) {
+        distribution.newBooks.forEach(book => {
+          if (book.count > 0) {
+            bookDistributions.push({
+              activity_id: activityData.id,
+              user_id: userId,
+              book_id: book.bookId,
+              count: book.count,
+            });
+          }
+        });
+      }
+
+      // Insert all book distributions
+      if (bookDistributions.length > 0) {
+        const { error: bdError } = await supabase
+          .from('book_distributions')
+          .insert(bookDistributions);
+
+        // If table doesn't exist, just log and continue (backward compatibility)
+        if (bdError && !bdError.message.includes('does not exist')) {
+          console.warn('Could not save book distributions:', bdError);
+        }
+      }
+
+      // Reload activities with book distributions from database
+      const updatedActivities = await get().loadUserActivities(userId);
+      
       // Update local state
-      const newActivity = transformActivity(activityData);
+      const newActivity = updatedActivities[0] || transformActivity(activityData);
+      
+      // Update user's bookDistributions object
+      const updatedBookDistributions = { ...user.bookDistributions || {} };
+      bookDistributions.forEach(bd => {
+        updatedBookDistributions[bd.book_id] = (updatedBookDistributions[bd.book_id] || 0) + (bd.count || 0);
+      });
       
       set((state) => {
         const updatedUsers = state.users.map((u) =>
@@ -484,7 +661,8 @@ export const useStore = create((set, get) => ({
                 chaitanyaCharitamrita: newChaitanyaCharitamrita,
                 otherBooks: newOtherBooks,
                 totalMoney: newTotalMoney,
-                activities: [newActivity, ...u.activities],
+                bookDistributions: updatedBookDistributions,
+                activities: updatedActivities, // Use reloaded activities with book distributions
               }
             : u
         );
@@ -501,7 +679,8 @@ export const useStore = create((set, get) => ({
                 chaitanyaCharitamrita: newChaitanyaCharitamrita,
                 otherBooks: newOtherBooks,
                 totalMoney: newTotalMoney,
-                activities: [newActivity, ...(state.currentUserProfile.activities || [])],
+                bookDistributions: updatedBookDistributions,
+                activities: updatedActivities, // Use reloaded activities with book distributions
               }
             : state.currentUserProfile;
 
@@ -535,7 +714,7 @@ export const useStore = create((set, get) => ({
   // Computed values
   getTotalStats: () => {
     const state = get();
-    return state.users.reduce(
+    const stats = state.users.reduce(
       (acc, user) => ({
         hindiGita: acc.hindiGita + user.hindiGita,
         englishGita: acc.englishGita + user.englishGita,
@@ -548,26 +727,98 @@ export const useStore = create((set, get) => ({
       }),
       { hindiGita: 0, englishGita: 0, smallBooks: 0, bhagavatam: 0, chaitanyaCharitamrita: 0, otherBooks: 0, totalMoney: 0, totalUsers: 0 }
     );
+    
+    // Aggregate book_distributions for all users (for dynamic books)
+    stats.bookDistributions = {};
+    state.users.forEach(user => {
+      if (user.bookDistributions) {
+        Object.keys(user.bookDistributions).forEach(bookId => {
+          if (!stats.bookDistributions[bookId]) {
+            stats.bookDistributions[bookId] = 0;
+          }
+          stats.bookDistributions[bookId] += user.bookDistributions[bookId] || 0;
+        });
+      }
+    });
+    
+    return stats;
   },
 
   getLeaderboard: () => {
     const state = get();
+    const books = state.books; // Get active books for calculating totals
+    const standardBookIds = ['hindiGita', 'englishGita', 'smallBooks', 'bhagavatam', 'chaitanyaCharitamrita', 'otherBooks'];
+    
     return [...state.users]
-      .sort((a, b) => {
-        const totalA = a.hindiGita + a.englishGita + a.smallBooks + (a.bhagavatam || 0) + (a.chaitanyaCharitamrita || 0) + (a.otherBooks || 0);
-        const totalB = b.hindiGita + b.englishGita + b.smallBooks + (b.bhagavatam || 0) + (b.chaitanyaCharitamrita || 0) + (b.otherBooks || 0);
-        return totalB - totalA;
+      .map((user) => {
+        let totalDistributed = 0;
+        
+        // If bookDistributions exists, sum all values from it
+        // Count both standard books and new books (if they're active)
+        if (user.bookDistributions && Object.keys(user.bookDistributions).length > 0) {
+          Object.keys(user.bookDistributions).forEach(bookId => {
+            const count = user.bookDistributions[bookId] || 0;
+            
+            // Check if this is a standard book (always count these)
+            const isStandardBook = standardBookIds.includes(bookId);
+            
+            // Check if this is an active book from the books table
+            const isActiveBook = books.some(b => {
+              const activeBookId = b.id || b.bookId;
+              return activeBookId === bookId;
+            });
+            
+            // Count if it's a standard book OR an active book
+            if (isStandardBook || isActiveBook) {
+              totalDistributed += count;
+            }
+          });
+        } else {
+          // Fallback: use standard columns if bookDistributions doesn't exist
+          totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+        }
+        
+        return {
+          ...user,
+          totalDistributed,
+        };
       })
-      .map((user) => ({
-        ...user,
-        totalDistributed: user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0),
-      }));
+      .sort((a, b) => b.totalDistributed - a.totalDistributed);
   },
 
   getActiveDevotees: () => {
     const state = get();
+    const books = state.books; // Get active books for calculating totals
+    const standardBookIds = ['hindiGita', 'englishGita', 'smallBooks', 'bhagavatam', 'chaitanyaCharitamrita', 'otherBooks'];
+    
     return state.users.filter((user) => {
-      const total = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+      let total = 0;
+      
+      // If bookDistributions exists, sum all values from it
+      // Count both standard books and new books (if they're active)
+      if (user.bookDistributions && Object.keys(user.bookDistributions).length > 0) {
+        Object.keys(user.bookDistributions).forEach(bookId => {
+          const count = user.bookDistributions[bookId] || 0;
+          
+          // Check if this is a standard book (always count these)
+          const isStandardBook = standardBookIds.includes(bookId);
+          
+          // Check if this is an active book from the books table
+          const isActiveBook = books.some(b => {
+            const activeBookId = b.id || b.bookId;
+            return activeBookId === bookId;
+          });
+          
+          // Count if it's a standard book OR an active book
+          if (isStandardBook || isActiveBook) {
+            total += count;
+          }
+        });
+      } else {
+        // Fallback: use standard columns if bookDistributions doesn't exist
+        total = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+      }
+      
       return total > 0;
     });
   },
@@ -580,6 +831,7 @@ export const useStore = create((set, get) => ({
     if (state.realtimeSubscriptions) {
       state.realtimeSubscriptions.users?.unsubscribe();
       state.realtimeSubscriptions.activities?.unsubscribe();
+      state.realtimeSubscriptions.bookDistributions?.unsubscribe();
     }
 
     console.log('🔴 Setting up real-time subscriptions...');
@@ -686,13 +938,43 @@ export const useStore = create((set, get) => ({
             .order('date', { ascending: false });
 
           if (!error && activities) {
-            // Group activities by user_id
+            // Load book distributions for all activities
+            const activityIds = activities.map(a => a.id);
+            let bookDistributionsByActivity = {};
+            
+            if (activityIds.length > 0) {
+              try {
+                const { data: bookDistributions } = await supabase
+                  .from('book_distributions')
+                  .select('*')
+                  .in('activity_id', activityIds);
+
+                if (bookDistributions) {
+                  bookDistributions.forEach(bd => {
+                    if (!bookDistributionsByActivity[bd.activity_id]) {
+                      bookDistributionsByActivity[bd.activity_id] = {};
+                    }
+                    bookDistributionsByActivity[bd.activity_id][bd.book_id] = 
+                      (bookDistributionsByActivity[bd.activity_id][bd.book_id] || 0) + (bd.count || 0);
+                  });
+                }
+              } catch (err) {
+                console.warn('Could not fetch book distributions in real-time:', err);
+              }
+            }
+
+            // Group activities by user_id and attach book distributions
             const activitiesByUser = {};
             activities.forEach((activity) => {
               if (!activitiesByUser[activity.user_id]) {
                 activitiesByUser[activity.user_id] = [];
               }
-              activitiesByUser[activity.user_id].push(transformActivity(activity));
+              const transformedActivity = transformActivity(activity);
+              // Attach book distributions if available
+              if (bookDistributionsByActivity[activity.id]) {
+                transformedActivity.bookDistributions = bookDistributionsByActivity[activity.id];
+              }
+              activitiesByUser[activity.user_id].push(transformedActivity);
             });
 
             // Update users with new activities
@@ -718,7 +1000,54 @@ export const useStore = create((set, get) => ({
               currentUserProfile: updatedCurrentUserProfile,
             });
 
-            console.log('✅ Activities updated in real-time!');
+            console.log('✅ Activities updated in real-time with book distributions!');
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to book_distributions table changes
+    const bookDistributionsSubscription = supabase
+      .channel('book-distributions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'book_distributions',
+        },
+        async (payload) => {
+          console.log('📊 Book distributions table changed:', payload.eventType);
+          
+          // Reload activities for affected user to get updated book distributions
+          if (payload.new?.user_id || payload.old?.user_id) {
+            const affectedUserId = payload.new?.user_id || payload.old?.user_id;
+            const updatedActivities = await get().loadUserActivities(affectedUserId);
+            
+            // Update user's activities in store
+            const currentState = get();
+            const updatedUsers = currentState.users.map((user) => {
+              if (user.id === affectedUserId) {
+                return { ...user, activities: updatedActivities };
+              }
+              return user;
+            });
+
+            // Update current user profile if it's the affected user
+            let updatedCurrentUserProfile = currentState.currentUserProfile;
+            if (currentState.currentUserProfile?.id === affectedUserId) {
+              const updatedProfile = updatedUsers.find(u => u.id === affectedUserId);
+              if (updatedProfile) {
+                updatedCurrentUserProfile = updatedProfile;
+              }
+            }
+
+            set({
+              users: updatedUsers,
+              currentUserProfile: updatedCurrentUserProfile,
+            });
+
+            console.log('✅ Book distributions updated in real-time!');
           }
         }
       )
@@ -729,6 +1058,7 @@ export const useStore = create((set, get) => ({
       realtimeSubscriptions: {
         users: usersSubscription,
         activities: activitiesSubscription,
+        bookDistributions: bookDistributionsSubscription,
       },
     });
 
@@ -742,6 +1072,7 @@ export const useStore = create((set, get) => ({
       console.log('🔴 Cleaning up real-time subscriptions...');
       state.realtimeSubscriptions.users?.unsubscribe();
       state.realtimeSubscriptions.activities?.unsubscribe();
+      state.realtimeSubscriptions.bookDistributions?.unsubscribe();
       set({ realtimeSubscriptions: null });
     }
   },
@@ -1025,6 +1356,100 @@ export const useStore = create((set, get) => ({
       console.log('✅ Activity deleted and user totals recalculated');
     } catch (error) {
       console.error('Error deleting activity:', error);
+      throw error;
+    }
+  },
+
+  // Books management functions
+  loadBooks: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('books')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Transform database books to app format
+      const transformedBooks = (data || []).map((book) => ({
+        id: book.book_id, // Use book_id as id for compatibility
+        bookId: book.book_id,
+        name: book.name,
+        icon: book.icon || '📖',
+        price: parseFloat(book.price || 0),
+        description: book.description || '',
+        color: book.color || 'text-gray-600',
+        bgColor: book.bg_color || 'bg-gray-600',
+        isActive: book.is_active !== false,
+      }));
+
+      set({ books: transformedBooks });
+      return transformedBooks;
+    } catch (error) {
+      console.error('Error loading books:', error);
+      set({ error: error.message });
+      throw error;
+    }
+  },
+
+  addBook: async (bookData) => {
+    try {
+      const { data, error } = await supabase
+        .from('books')
+        .insert([
+          {
+            book_id: bookData.bookId,
+            name: bookData.name,
+            icon: bookData.icon || '📖',
+            price: bookData.price,
+            description: bookData.description || '',
+            color: bookData.color || 'text-gray-600',
+            bg_color: bookData.bgColor || 'bg-gray-600',
+            is_active: true,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Reload books
+      await get().loadBooks();
+
+      return {
+        id: data.book_id,
+        bookId: data.book_id,
+        name: data.name,
+        icon: data.icon,
+        price: parseFloat(data.price),
+        description: data.description,
+        color: data.color,
+        bgColor: data.bg_color,
+        isActive: data.is_active,
+      };
+    } catch (error) {
+      console.error('Error adding book:', error);
+      throw error;
+    }
+  },
+
+  deleteBook: async (bookId) => {
+    try {
+      // Soft delete by setting is_active to false
+      const { error } = await supabase
+        .from('books')
+        .update({ is_active: false })
+        .eq('book_id', bookId);
+
+      if (error) throw error;
+
+      // Reload books
+      await get().loadBooks();
+
+      console.log('✅ Book deleted successfully');
+    } catch (error) {
+      console.error('Error deleting book:', error);
       throw error;
     }
   },

@@ -1,24 +1,32 @@
 import { useStore } from '../store/useStore';
 import { Link, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { getBookValue, getStatsBookValue } from '../utils/bookMapping';
 
 const Dashboard = () => {
   const totalStats = useStore((state) => state.getTotalStats());
   const leaderboard = useStore((state) => state.getLeaderboard());
   const activeDevotees = useStore((state) => state.getActiveDevotees());
+  const books = useStore((state) => state.books);
+  const loadBooks = useStore((state) => state.loadBooks);
   const navigate = useNavigate();
+
+  // Load books on mount
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks]);
 
   // Filter out users with 0 total books
   const activeLeaderboard = leaderboard.filter((user) => user.totalDistributed > 0);
   const top3 = activeLeaderboard.slice(0, 3);
   const top10 = activeLeaderboard.slice(0, 10);
 
-  // Calculate total books
-  const totalBooks = totalStats.hindiGita + 
-    totalStats.englishGita + 
-    totalStats.smallBooks + 
-    (totalStats.bhagavatam || 0) + 
-    (totalStats.chaitanyaCharitamrita || 0) + 
-    (totalStats.otherBooks || 0);
+  // Calculate total books from active books
+  // Use getStatsBookValue to handle both standard books and bookDistributions
+  const totalBooks = books.reduce((sum, book) => {
+    const bookId = book.id || book.bookId;
+    return sum + getStatsBookValue(totalStats, bookId);
+  }, 0);
 
   return (
     <div className="space-y-4 sm:space-y-6 md:space-y-8">
@@ -130,19 +138,21 @@ const Dashboard = () => {
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Rank</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[120px]">Devotee</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[100px]">Bace</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Hindi</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">English</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Small</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Bhagavatam</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Chaitanya</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Other</th>
+                  {books.map((book) => {
+                    const bookId = book.id || book.bookId;
+                    return (
+                      <th key={bookId} className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">
+                        {book.name.split(' ')[0]}
+                      </th>
+                    );
+                  })}
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Total</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {top10.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="py-8 sm:py-12 text-center">
+                    <td colSpan={5 + books.length} className="py-8 sm:py-12 text-center">
                       <p className="text-gray-500 text-base sm:text-lg">No Devotees found</p>
                     </td>
                   </tr>
@@ -197,12 +207,14 @@ const Dashboard = () => {
                     <td className="px-3 sm:px-4 py-3 sm:py-4 text-left font-medium text-sm sm:text-base whitespace-nowrap min-w-[100px]">
                       <span className="text-gray-800">🏛️ {user.other || 'Other'}</span>
                     </td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.hindiGita}</td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.englishGita}</td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.smallBooks}</td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.bhagavatam || 0}</td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.chaitanyaCharitamrita || 0}</td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.otherBooks || 0}</td>
+                    {books.map((book) => {
+                      const bookId = book.id || book.bookId;
+                      return (
+                        <td key={bookId} className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">
+                          {getBookValue(user, bookId)}
+                        </td>
+                      );
+                    })}
                     <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-bold text-sm sm:text-base text-spiritual-600 whitespace-nowrap">
                       {user.totalDistributed}
                     </td>

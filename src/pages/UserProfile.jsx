@@ -2,6 +2,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../contexts/AuthContext';
 import { formatMobileNumber } from '../utils/maskMobileNumber';
+import { useEffect } from 'react';
+import { getBookValue, getActivityBookValue, mapBookIdToUserProperty } from '../utils/bookMapping';
 
 const UserProfile = () => {
   const { userId } = useParams();
@@ -9,7 +11,32 @@ const UserProfile = () => {
   const { user: authUser, isAdmin } = useAuth();
   const users = useStore((state) => state.users);
   const currentUserProfile = useStore((state) => state.currentUserProfile);
+  const books = useStore((state) => state.books);
+  const loadBooks = useStore((state) => state.loadBooks);
+  const loadUserActivities = useStore((state) => state.loadUserActivities);
   const user = users.find((u) => u.id === userId);
+
+  // Load books on mount
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks]);
+
+  // Reload activities when user changes or component mounts to get latest book distributions
+  useEffect(() => {
+    if (user?.id) {
+      loadUserActivities(user.id).then(activities => {
+        // Update user's activities in store
+        const store = useStore.getState();
+        useStore.setState({
+          users: store.users.map(u => 
+            u.id === user.id ? { ...u, activities } : u
+          )
+        });
+      }).catch(err => {
+        console.warn('Could not reload activities:', err);
+      });
+    }
+  }, [user?.id, loadUserActivities]);
   
   // Check if viewing own profile
   const isOwnProfile = currentUserProfile && currentUserProfile.id === userId;
@@ -30,7 +57,10 @@ const UserProfile = () => {
     );
   }
 
-  const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+  const totalDistributed = books.reduce((sum, book) => {
+    const bookId = book.id || book.bookId;
+    return sum + getBookValue(user, bookId);
+  }, 0);
   const sortedActivities = [...user.activities].sort(
     (a, b) => new Date(b.date) - new Date(a.date)
   );
@@ -41,26 +71,22 @@ const UserProfile = () => {
     if (!acc[dateKey]) {
       acc[dateKey] = {
         date: dateKey,
-        hindiGita: 0,
-        englishGita: 0,
-        smallBooks: 0,
-        bhagavatam: 0,
-        chaitanyaCharitamrita: 0,
-        otherBooks: 0,
         moneyReceived: 0,
         moneyOnline: 0,
         moneyOffline: 0,
         entryCount: 0,
         activityIds: [],
+        bookValues: {}, // Store book values by bookId (works for both standard and new books)
       };
     }
-    // Merge all activities for same date
-    acc[dateKey].hindiGita += activity.hindiGita || 0;
-    acc[dateKey].englishGita += activity.englishGita || 0;
-    acc[dateKey].smallBooks += activity.smallBooks || 0;
-    acc[dateKey].bhagavatam += activity.bhagavatam || 0;
-    acc[dateKey].chaitanyaCharitamrita += activity.chaitanyaCharitamrita || 0;
-    acc[dateKey].otherBooks += activity.otherBooks || 0;
+    // Add book values dynamically using bookId directly
+    books.forEach((book) => {
+      const bookId = book.id || book.bookId;
+      if (!acc[dateKey].bookValues[bookId]) {
+        acc[dateKey].bookValues[bookId] = 0;
+      }
+      acc[dateKey].bookValues[bookId] += getActivityBookValue(activity, bookId);
+    });
     acc[dateKey].moneyReceived += activity.moneyReceived || 0;
     acc[dateKey].moneyOnline += activity.moneyOnline || 0;
     acc[dateKey].moneyOffline += activity.moneyOffline || 0;
@@ -144,66 +170,24 @@ const UserProfile = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        <div className="card bg-spiritual-50 border-2 border-spiritual-200 p-3 sm:p-4">
-          <div className="text-center">
-            <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">📖</div>
-            <p className="text-gray-600 text-xs font-medium mb-1">Hindi Gita</p>
-            <p className="text-xl sm:text-2xl font-bold text-spiritual-600">
-              {user.hindiGita}
-            </p>
-          </div>
-        </div>
-
-        <div className="card bg-primary-50 border-2 border-primary-200 p-3 sm:p-4">
-          <div className="text-center">
-            <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">📚</div>
-            <p className="text-gray-600 text-xs font-medium mb-1">English Gita</p>
-            <p className="text-xl sm:text-2xl font-bold text-primary-600">
-              {user.englishGita}
-            </p>
-          </div>
-        </div>
-
-        <div className="card bg-green-50 border-2 border-green-200 p-3 sm:p-4">
-          <div className="text-center">
-            <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">📗</div>
-            <p className="text-gray-600 text-xs font-medium mb-1">Small Books</p>
-            <p className="text-xl sm:text-2xl font-bold text-green-600">
-              {user.smallBooks}
-            </p>
-          </div>
-        </div>
-
-        <div className="card bg-indigo-50 border-2 border-indigo-200 p-3 sm:p-4">
-          <div className="text-center">
-            <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">📿</div>
-            <p className="text-gray-600 text-xs font-medium mb-1">Bhagavatam</p>
-            <p className="text-xl sm:text-2xl font-bold text-indigo-600">
-              {user.bhagavatam || 0}
-            </p>
-          </div>
-        </div>
-
-        <div className="card bg-pink-50 border-2 border-pink-200 p-3 sm:p-4">
-          <div className="text-center">
-            <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">📿</div>
-            <p className="text-gray-600 text-xs font-medium mb-1 break-words">Chaitanya Charitamrita</p>
-            <p className="text-xl sm:text-2xl font-bold text-pink-600">
-              {user.chaitanyaCharitamrita || 0}
-            </p>
-          </div>
-        </div>
-
-        <div className="card bg-amber-50 border-2 border-amber-200 p-3 sm:p-4">
-          <div className="text-center">
-            <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">📚</div>
-            <p className="text-gray-600 text-xs font-medium mb-1">Other Books</p>
-            <p className="text-xl sm:text-2xl font-bold text-amber-600">
-              {user.otherBooks || 0}
-            </p>
-          </div>
-        </div>
+      <div className={`grid gap-3 sm:gap-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+        {books.map((book) => {
+          const bookId = book.id || book.bookId;
+          const value = getBookValue(user, bookId);
+          const bgColor = book.bgColor ? book.bgColor.replace('bg-', 'bg-').replace('-600', '-50') : 'bg-gray-50';
+          const borderColor = book.bgColor ? book.bgColor.replace('bg-', 'border-').replace('-600', '-200') : 'border-gray-200';
+          return (
+            <div key={bookId} className={`card ${bgColor} border-2 ${borderColor} p-3 sm:p-4`}>
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">{book.icon || '📖'}</div>
+                <p className="text-gray-600 text-xs font-medium mb-1 break-words">{book.name}</p>
+                <p className={`text-xl sm:text-2xl font-bold ${book.color || 'text-gray-600'}`}>
+                  {value}
+                </p>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Activity History */}
@@ -229,12 +213,10 @@ const UserProfile = () => {
         ) : (
           <div className="space-y-4">
             {mergedActivities.map((mergedActivity) => {
-              const totalBooks = mergedActivity.hindiGita + 
-                mergedActivity.englishGita + 
-                mergedActivity.smallBooks + 
-                (mergedActivity.bhagavatam || 0) + 
-                (mergedActivity.chaitanyaCharitamrita || 0) + 
-                (mergedActivity.otherBooks || 0);
+              const totalBooks = books.reduce((sum, book) => {
+                const bookId = book.id || book.bookId;
+                return sum + (mergedActivity.bookValues?.[bookId] || 0);
+              }, 0);
               const hasMultipleEntries = mergedActivity.entryCount > 1;
               
               return (
@@ -265,43 +247,20 @@ const UserProfile = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
-                    <div className="bg-spiritual-50 rounded-lg p-2">
-                      <p className="text-xs text-gray-600 mb-1">Hindi Gita</p>
-                      <p className="text-lg font-bold text-spiritual-600">
-                        {mergedActivity.hindiGita}
-                      </p>
-                    </div>
-                    <div className="bg-primary-50 rounded-lg p-2">
-                      <p className="text-xs text-gray-600 mb-1">English Gita</p>
-                      <p className="text-lg font-bold text-primary-600">
-                        {mergedActivity.englishGita}
-                      </p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-2">
-                      <p className="text-xs text-gray-600 mb-1">Small Books</p>
-                      <p className="text-lg font-bold text-green-600">
-                        {mergedActivity.smallBooks}
-                      </p>
-                    </div>
-                    <div className="bg-indigo-50 rounded-lg p-2">
-                      <p className="text-xs text-gray-600 mb-1">Bhagavatam</p>
-                      <p className="text-lg font-bold text-indigo-600">
-                        {mergedActivity.bhagavatam || 0}
-                      </p>
-                    </div>
-                    <div className="bg-pink-50 rounded-lg p-2">
-                      <p className="text-xs text-gray-600 mb-1 break-words">Chaitanya Charitamrita</p>
-                      <p className="text-base sm:text-lg font-bold text-pink-600">
-                        {mergedActivity.chaitanyaCharitamrita || 0}
-                      </p>
-                    </div>
-                    <div className="bg-amber-50 rounded-lg p-2">
-                      <p className="text-xs text-gray-600 mb-1">Other Books</p>
-                      <p className="text-lg font-bold text-amber-600">
-                        {mergedActivity.otherBooks || 0}
-                      </p>
-                    </div>
+                  <div className={`grid gap-2 sm:gap-3 mb-3 sm:mb-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+                    {books.map((book) => {
+                      const bookId = book.id || book.bookId;
+                      const value = mergedActivity.bookValues?.[bookId] || 0;
+                      const bgColor = book.bgColor ? book.bgColor.replace('bg-', 'bg-').replace('-600', '-50') : 'bg-gray-50';
+                      return (
+                        <div key={bookId} className={`${bgColor} rounded-lg p-2`}>
+                          <p className="text-xs text-gray-600 mb-1 break-words">{book.name}</p>
+                          <p className={`text-lg font-bold ${book.color || 'text-gray-600'}`}>
+                            {value}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {mergedActivity.moneyReceived > 0 && (

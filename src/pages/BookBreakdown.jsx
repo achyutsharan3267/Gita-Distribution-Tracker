@@ -1,8 +1,17 @@
 import { useStore } from '../store/useStore';
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { getStatsBookValue, mapBookIdToUserProperty } from '../utils/bookMapping';
 
 const BookBreakdown = () => {
   const totalStats = useStore((state) => state.getTotalStats());
+  const books = useStore((state) => state.books);
+  const loadBooks = useStore((state) => state.loadBooks);
+
+  // Load books on mount
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks]);
 
   const StatCard = ({ title, value, icon, color, isTopSelling = false }) => (
     <div className={`card p-3 sm:p-4 md:p-6 relative ${isTopSelling ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}`}>
@@ -22,64 +31,24 @@ const BookBreakdown = () => {
     </div>
   );
 
-  const totalBooks = totalStats.hindiGita + 
-    totalStats.englishGita + 
-    totalStats.smallBooks + 
-    (totalStats.bhagavatam || 0) + 
-    (totalStats.chaitanyaCharitamrita || 0) + 
-    (totalStats.otherBooks || 0);
+  // Calculate total books from active books
+  const totalBooks = books.reduce((sum, book) => {
+    const bookId = book.id || book.bookId;
+    return sum + getStatsBookValue(totalStats, bookId);
+  }, 0);
 
-  // Create array of all books with their data and sort by count (descending)
-  const allBooks = [
-    {
-      title: 'Hindi Gita Distributed',
-      value: totalStats.hindiGita,
-      icon: '📖',
-      color: 'text-spiritual-600',
-      bgColor: 'bg-spiritual-600',
-      key: 'hindiGita',
-    },
-    {
-      title: 'English Gita Distributed',
-      value: totalStats.englishGita,
-      icon: '📚',
-      color: 'text-primary-600',
-      bgColor: 'bg-primary-600',
-      key: 'englishGita',
-    },
-    {
-      title: 'Small Books Distributed',
-      value: totalStats.smallBooks,
-      icon: '📗',
-      color: 'text-green-600',
-      bgColor: 'bg-green-600',
-      key: 'smallBooks',
-    },
-    {
-      title: 'Bhagavatam Distributed',
-      value: totalStats.bhagavatam || 0,
-      icon: '📜',
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-600',
-      key: 'bhagavatam',
-    },
-    {
-      title: 'Chaitanya Charitamrita',
-      value: totalStats.chaitanyaCharitamrita || 0,
-      icon: '📖',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-600',
-      key: 'chaitanyaCharitamrita',
-    },
-    {
-      title: 'Other Books Distributed',
-      value: totalStats.otherBooks || 0,
-      icon: '📘',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-600',
-      key: 'otherBooks',
-    },
-  ].sort((a, b) => b.value - a.value); // Sort by count descending
+  // Create array of all active books with their data and sort by count (descending)
+  const allBooks = books.map((book) => {
+    const bookId = book.id || book.bookId;
+    return {
+      title: `${book.name} Distributed`,
+      value: getStatsBookValue(totalStats, bookId),
+      icon: book.icon || '📖',
+      color: book.color || 'text-gray-600',
+      bgColor: book.bgColor || 'bg-gray-600',
+      key: bookId,
+    };
+  }).sort((a, b) => b.value - a.value); // Sort by count descending
 
   return (
     <div className="space-y-4 sm:space-y-6 md:space-y-8">

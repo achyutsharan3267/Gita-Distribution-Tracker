@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { uploadProfilePhoto, deleteProfilePhoto } from '../utils/storage';
 import { supabase } from '../lib/supabase';
+import { getBookValue } from '../utils/bookMapping';
 
 const EditProfile = () => {
   const navigate = useNavigate();
@@ -13,6 +14,8 @@ const EditProfile = () => {
   const initialize = useStore((state) => state.initialize);
   const getCurrentUserProfile = useStore((state) => state.getCurrentUserProfile);
   const loading = useStore((state) => state.loading);
+  const books = useStore((state) => state.books);
+  const loadBooks = useStore((state) => state.loadBooks);
 
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
@@ -61,6 +64,19 @@ const EditProfile = () => {
       setPhotoPreview(currentUserProfile.photo || null);
     }
   }, [currentUserProfile]);
+
+  // Load books from database on mount
+  useEffect(() => {
+    const initializeBooks = async () => {
+      try {
+        await loadBooks();
+      } catch (error) {
+        console.error('Error loading books:', error);
+      }
+    };
+    
+    initializeBooks();
+  }, [loadBooks]);
 
   // Show loading state
   if (authLoading || loading || profileLoading || !user) {
@@ -288,26 +304,32 @@ const EditProfile = () => {
         {/* Current Stats (Read-only) */}
         <div className="border-t pt-4 sm:pt-6">
           <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Your Current Stats</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            <div className="text-center bg-spiritual-50 rounded-lg p-2 sm:p-3">
-              <p className="text-xl sm:text-2xl font-bold text-spiritual-600">{currentUserProfile.hindiGita}</p>
-              <p className="text-xs text-gray-600">Hindi Gita</p>
+          {!currentUserProfile ? (
+            <p className="text-center text-gray-500 py-4">Loading profile...</p>
+          ) : books.length === 0 ? (
+            <p className="text-center text-gray-500 py-4">Loading books...</p>
+          ) : (
+            <div className={`grid gap-3 sm:gap-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-4' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+              {books.map((book) => {
+                const bookId = book.id || book.bookId;
+                const value = getBookValue(currentUserProfile, bookId);
+                const bgColor = book.bgColor ? book.bgColor.replace('bg-', 'bg-').replace('-600', '-50') : 'bg-gray-50';
+                const color = book.color || 'text-gray-600';
+                return (
+                  <div key={bookId} className={`text-center ${bgColor} rounded-lg p-2 sm:p-3`}>
+                    <p className={`text-xl sm:text-2xl font-bold ${color}`}>{value || 0}</p>
+                    <p className="text-xs text-gray-600 truncate">{book.name}</p>
+                  </div>
+                );
+              })}
+              <div className="text-center bg-purple-50 rounded-lg p-2 sm:p-3">
+                <p className="text-xl sm:text-2xl font-bold text-purple-600">
+                  ₹{currentUserProfile.totalMoney.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-600">Total Money</p>
+              </div>
             </div>
-            <div className="text-center bg-primary-50 rounded-lg p-2 sm:p-3">
-              <p className="text-xl sm:text-2xl font-bold text-primary-600">{currentUserProfile.englishGita}</p>
-              <p className="text-xs text-gray-600">English Gita</p>
-            </div>
-            <div className="text-center bg-green-50 rounded-lg p-2 sm:p-3">
-              <p className="text-xl sm:text-2xl font-bold text-green-600">{currentUserProfile.smallBooks}</p>
-              <p className="text-xs text-gray-600">Small Books</p>
-            </div>
-            <div className="text-center bg-purple-50 rounded-lg p-2 sm:p-3">
-              <p className="text-xl sm:text-2xl font-bold text-purple-600">
-                ₹{currentUserProfile.totalMoney.toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-600">Total Money</p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Buttons */}

@@ -1,17 +1,25 @@
 import { Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { formatMobileNumber } from '../utils/maskMobileNumber';
+import { getBookValue, mapBookIdToUserProperty } from '../utils/bookMapping';
 import * as XLSX from 'xlsx';
 
 const UserList = () => {
   const users = useStore((state) => state.users);
   const leaderboard = useStore((state) => state.getLeaderboard());
+  const books = useStore((state) => state.books);
+  const loadBooks = useStore((state) => state.loadBooks);
   const { user: authUser, isAdmin } = useAuth();
   const currentUserProfile = useStore((state) => state.currentUserProfile);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
+
+  // Load books on mount
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks]);
 
   // Filter users based on search query (name, mobile number, email)
   const filteredLeaderboard = useMemo(() => {
@@ -30,25 +38,35 @@ const UserList = () => {
 
   // Export to Excel function
   const exportToExcel = () => {
-    // Prepare data for Excel
+    // Prepare data for Excel with all active books
     const excelData = filteredLeaderboard.map((user) => {
-      const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+      // Calculate total using getBookValue to include all books (standard + new)
+      const totalDistributed = books.reduce((sum, book) => {
+        const bookId = book.id || book.bookId;
+        return sum + getBookValue(user, bookId);
+      }, 0);
       
-      return {
+      // Build base object with user info
+      const rowData = {
         'Name': user.name || '',
         'Email': user.email || '',
         'Mobile Number': user.mobileNumber || '',
         'Bace': user.other || 'Other',
         'City': user.city || '',
-        'Hindi Gita': user.hindiGita || 0,
-        'English Gita': user.englishGita || 0,
-        'Small Books': user.smallBooks || 0,
-        'Bhagavatam': user.bhagavatam || 0,
-        'Chaitanya Charitamrita': user.chaitanyaCharitamrita || 0,
-        'Other Books': user.otherBooks || 0,
-        'Total Books Distributed': totalDistributed,
-        'Total Money Collected (₹)': user.totalMoney || 0,
       };
+      
+      // Add all active books dynamically
+      books.forEach((book) => {
+        const bookId = book.id || book.bookId;
+        const value = getBookValue(user, bookId);
+        rowData[book.name] = value || 0;
+      });
+      
+      // Add totals
+      rowData['Total Books Distributed'] = totalDistributed;
+      rowData['Total Money Collected (₹)'] = user.totalMoney || 0;
+      
+      return rowData;
     });
 
     // Create workbook and worksheet
@@ -56,22 +74,24 @@ const UserList = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Devotees List');
 
-    // Set column widths
+    // Set column widths dynamically
     const columnWidths = [
       { wch: 20 }, // Name
       { wch: 25 }, // Email
       { wch: 15 }, // Mobile Number
       { wch: 15 }, // Bace
       { wch: 15 }, // City
-      { wch: 12 }, // Hindi Gita
-      { wch: 13 }, // English Gita
-      { wch: 12 }, // Small Books
-      { wch: 12 }, // Bhagavatam
-      { wch: 20 }, // Chaitanya Charitamrita
-      { wch: 12 }, // Other Books
-      { wch: 20 }, // Total Books Distributed
-      { wch: 20 }, // Total Money Collected
     ];
+    
+    // Add widths for all books
+    books.forEach(() => {
+      columnWidths.push({ wch: 15 }); // Each book column
+    });
+    
+    // Add widths for totals
+    columnWidths.push({ wch: 20 }); // Total Books Distributed
+    columnWidths.push({ wch: 20 }); // Total Money Collected
+    
     worksheet['!cols'] = columnWidths;
 
     // Generate filename with current date
@@ -231,31 +251,17 @@ const UserList = () => {
                   <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
-                    <div className="bg-spiritual-50 rounded-lg p-2 sm:p-3 text-center">
-                      <p className="text-base sm:text-lg font-bold text-spiritual-600">{user.hindiGita}</p>
-                      <p className="text-xs text-gray-600">Hindi Gita</p>
-                    </div>
-                    <div className="bg-primary-50 rounded-lg p-2 sm:p-3 text-center">
-                      <p className="text-base sm:text-lg font-bold text-primary-600">{user.englishGita}</p>
-                      <p className="text-xs text-gray-600">English Gita</p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-2 sm:p-3 text-center">
-                      <p className="text-base sm:text-lg font-bold text-green-600">{user.smallBooks}</p>
-                      <p className="text-xs text-gray-600">Small Books</p>
-                    </div>
-                    <div className="bg-yellow-50 rounded-lg p-2 sm:p-3 text-center">
-                      <p className="text-base sm:text-lg font-bold text-yellow-600">{user.bhagavatam || 0}</p>
-                      <p className="text-xs text-gray-600">Bhagavatam</p>
-                    </div>
-                    <div className="bg-purple-50 rounded-lg p-2 sm:p-3 text-center">
-                      <p className="text-base sm:text-lg font-bold text-purple-600">{user.chaitanyaCharitamrita || 0}</p>
-                      <p className="text-xs text-gray-600">Chaitanya</p>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-2 sm:p-3 text-center">
-                      <p className="text-base sm:text-lg font-bold text-blue-600">{user.otherBooks || 0}</p>
-                      <p className="text-xs text-gray-600">Other Books</p>
-                    </div>
+                  <div className={`grid gap-2 sm:gap-3 mb-3 sm:mb-4 ${books.length <= 3 ? 'grid-cols-3' : books.length <= 6 ? 'grid-cols-3' : 'grid-cols-3'}`}>
+                    {books.map((book) => {
+                      const bookId = book.id || book.bookId;
+                      const value = getBookValue(user, bookId);
+                      return (
+                        <div key={bookId} className={`rounded-lg p-2 sm:p-3 text-center ${book.bgColor ? book.bgColor.replace('bg-', 'bg-').replace('-600', '-50') : 'bg-gray-50'}`}>
+                          <p className={`text-base sm:text-lg font-bold ${book.color || 'text-gray-600'}`}>{value}</p>
+                          <p className="text-xs text-gray-600 truncate">{book.name.split(' ')[0]}</p>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div className="border-t pt-3 sm:pt-4">
@@ -296,19 +302,24 @@ const UserList = () => {
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Rank</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[120px]">Devotee</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[100px]">Bace</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Hindi</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">English</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Small</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Bhagavatam</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Chaitanya</th>
-                    <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Other</th>
+                    {books.map((book) => {
+                      const bookId = book.id || book.bookId;
+                      return (
+                        <th key={bookId} className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">
+                          {book.name.split(' ')[0]}
+                        </th>
+                      );
+                    })}
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Total</th>
                     <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Money</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredLeaderboard.map((user, index) => {
-                    const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+                    const totalDistributed = books.reduce((sum, book) => {
+                      const bookId = book.id || book.bookId;
+                      return sum + getBookValue(user, bookId);
+                    }, 0);
                     return (
                       <tr
                         key={user.id}
@@ -362,12 +373,14 @@ const UserList = () => {
                         <td className="px-3 sm:px-4 py-3 sm:py-4 text-left font-medium text-sm sm:text-base whitespace-nowrap min-w-[100px]">
                           <span className="text-gray-800">🏛️ {user.other || 'Other'}</span>
                         </td>
-                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.hindiGita}</td>
-                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.englishGita}</td>
-                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.smallBooks}</td>
-                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.bhagavatam || 0}</td>
-                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.chaitanyaCharitamrita || 0}</td>
-                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">{user.otherBooks || 0}</td>
+                        {books.map((book) => {
+                          const bookId = book.id || book.bookId;
+                          return (
+                            <td key={bookId} className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">
+                              {getBookValue(user, bookId)}
+                            </td>
+                          );
+                        })}
                         <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-bold text-sm sm:text-base text-spiritual-600 whitespace-nowrap">
                           {totalDistributed}
                         </td>

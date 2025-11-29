@@ -4,11 +4,15 @@ import { useStore } from '../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+import { mapBookIdToDbColumn, getBookValue } from '../utils/bookMapping';
+
 const DistributionForm = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const currentUserProfile = useStore((state) => state.currentUserProfile);
   const updateUserDistribution = useStore((state) => state.updateUserDistribution);
+  const books = useStore((state) => state.books);
+  const loadBooks = useStore((state) => state.loadBooks);
 
   // Redirect if no profile exists
   useEffect(() => {
@@ -27,19 +31,51 @@ const DistributionForm = () => {
   }
 
   const [formData, setFormData] = useState({
-    hindiGita: '',
-    englishGita: '',
-    smallBooks: '',
-    bhagavatam: '',
-    chaitanyaCharitamrita: '',
-    otherBooks: '',
     moneyReceived: '',
     moneyOnline: '',
     moneyOffline: '',
   });
-
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load books from database and initialize formData
+  useEffect(() => {
+    const initializeBooks = async () => {
+      try {
+        await loadBooks();
+      } catch (error) {
+        console.error('Error loading books:', error);
+      }
+    };
+    
+    initializeBooks();
+  }, [loadBooks]);
+
+  // Initialize formData when books change
+  useEffect(() => {
+    if (books.length > 0) {
+      const initialFormData = {
+        moneyReceived: '',
+        moneyOnline: '',
+        moneyOffline: '',
+      };
+      books.forEach(book => {
+        const bookId = book.id || book.bookId;
+        // Use bookId directly as field name (works for both standard and new books)
+        initialFormData[bookId] = '';
+      });
+      setFormData(prev => {
+        // Merge with existing formData to preserve user input
+        const merged = { ...initialFormData };
+        Object.keys(prev).forEach(key => {
+          if (merged.hasOwnProperty(key)) {
+            merged[key] = prev[key];
+          }
+        });
+        return merged;
+      });
+    }
+  }, [books]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -85,21 +121,52 @@ const DistributionForm = () => {
 
     setIsSubmitting(true);
 
+    // Build distribution object dynamically from active books
     const distribution = {
-      hindiGita: Number(formData.hindiGita) || 0,
-      englishGita: Number(formData.englishGita) || 0,
-      smallBooks: Number(formData.smallBooks) || 0,
-      bhagavatam: Number(formData.bhagavatam) || 0,
-      chaitanyaCharitamrita: Number(formData.chaitanyaCharitamrita) || 0,
-      otherBooks: Number(formData.otherBooks) || 0,
       moneyReceived: Number(formData.moneyReceived) || 0,
       moneyOnline: Number(formData.moneyOnline) || 0,
       moneyOffline: Number(formData.moneyOffline) || 0,
+      newBooks: [], // For books not in standard mapping
     };
 
-    // Check if at least one field has a value
-    const hasAnyValue = Object.values(distribution).some((val) => val > 0);
-    if (!hasAnyValue) {
+    // Add book fields dynamically
+    books.forEach(book => {
+      const bookId = book.id || book.bookId;
+      // Use bookId directly from formData (works for both standard and new books)
+      const value = Number(formData[bookId]) || 0;
+      
+      // Check if it's a standard book or new book
+      const standardFieldName = mapBookIdToDbColumn(bookId);
+      
+      if (standardFieldName === null) {
+        // New book not in mapping - add to newBooks array
+        if (value > 0) {
+          distribution.newBooks.push({
+            bookId: bookId,
+            count: value,
+          });
+        }
+      } else {
+        // Standard book - add to distribution object using standard field name
+        distribution[standardFieldName] = value;
+      }
+    });
+
+    // Ensure all standard fields are present (for backward compatibility with database)
+    if (!distribution.hindiGita) distribution.hindiGita = 0;
+    if (!distribution.englishGita) distribution.englishGita = 0;
+    if (!distribution.smallBooks) distribution.smallBooks = 0;
+    if (!distribution.bhagavatam) distribution.bhagavatam = 0;
+    if (!distribution.chaitanyaCharitamrita) distribution.chaitanyaCharitamrita = 0;
+    if (!distribution.otherBooks) distribution.otherBooks = 0;
+
+    // Check if at least one field has a value (including new books)
+    const hasStandardValue = Object.values(distribution).some((val) => 
+      typeof val === 'number' && val > 0
+    );
+    const hasNewBookValue = distribution.newBooks && distribution.newBooks.length > 0;
+    
+    if (!hasStandardValue && !hasNewBookValue) {
       setErrors({ general: 'Please fill at least one field' });
       setIsSubmitting(false);
       return;
@@ -108,18 +175,18 @@ const DistributionForm = () => {
     try {
       await updateUserDistribution(currentUserProfile.id, distribution, user?.id);
 
-      // Reset form
-      setFormData({
-        hindiGita: '',
-        englishGita: '',
-        smallBooks: '',
-        bhagavatam: '',
-        chaitanyaCharitamrita: '',
-        otherBooks: '',
+      // Reset form dynamically
+      const resetFormData = {
         moneyReceived: '',
         moneyOnline: '',
         moneyOffline: '',
+      };
+      books.forEach(book => {
+        const bookId = book.id || book.bookId;
+        // Use bookId directly as field name (works for both standard and new books)
+        resetFormData[bookId] = '';
       });
+      setFormData(resetFormData);
 
       setIsSubmitting(false);
       
@@ -171,98 +238,31 @@ const DistributionForm = () => {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-              Hindi Gita Distributed
-            </label>
-            <input
-              type="number"
-              name="hindiGita"
-              value={formData.hindiGita}
-              onChange={handleChange}
-              min="0"
-              className="input-field text-sm sm:text-base"
-              placeholder="0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-              English Gita Distributed
-            </label>
-            <input
-              type="number"
-              name="englishGita"
-              value={formData.englishGita}
-              onChange={handleChange}
-              min="0"
-              className="input-field text-sm sm:text-base"
-              placeholder="0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-              Small Books Distributed
-            </label>
-            <input
-              type="number"
-              name="smallBooks"
-              value={formData.smallBooks}
-              onChange={handleChange}
-              min="0"
-              className="input-field text-sm sm:text-base"
-              placeholder="0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-              📿 Bhagavatam
-            </label>
-            <input
-              type="number"
-              name="bhagavatam"
-              value={formData.bhagavatam}
-              onChange={handleChange}
-              min="0"
-              className="input-field text-sm sm:text-base"
-              placeholder="0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-              📿 Chaitanya Charitamrita
-            </label>
-            <input
-              type="number"
-              name="chaitanyaCharitamrita"
-              value={formData.chaitanyaCharitamrita}
-              onChange={handleChange}
-              min="0"
-              className="input-field text-sm sm:text-base"
-              placeholder="0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-              📚 Other Prabhupada Books
-            </label>
-            <input
-              type="number"
-              name="otherBooks"
-              value={formData.otherBooks}
-              onChange={handleChange}
-              min="0"
-              className="input-field text-sm sm:text-base"
-              placeholder="0"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Other Srila Prabhupada books
-            </p>
-          </div>
+          {books.map((book) => {
+            const bookId = book.id || book.bookId;
+            // Use bookId directly as field name (works for both standard and new books)
+            return (
+              <div key={bookId}>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  {book.icon ? `${book.icon} ` : ''}{book.name}
+                </label>
+                <input
+                  type="number"
+                  name={bookId}
+                  value={formData[bookId] || ''}
+                  onChange={handleChange}
+                  min="0"
+                  className="input-field text-sm sm:text-base"
+                  placeholder="0"
+                />
+                {book.description && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {book.description}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="border-t pt-4 sm:pt-6">
@@ -348,26 +348,32 @@ const DistributionForm = () => {
       {/* Current Stats Preview */}
       <div className="card mt-4 sm:mt-6 bg-gray-50 p-4 sm:p-6">
         <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Your Current Totals</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-spiritual-600">{currentUserProfile.hindiGita}</p>
-            <p className="text-xs text-gray-600">Hindi Gita</p>
+        {!currentUserProfile ? (
+          <p className="text-center text-gray-500 py-4">Loading profile...</p>
+        ) : books.length === 0 ? (
+          <p className="text-center text-gray-500 py-4">Loading books...</p>
+        ) : (
+          <div className={`grid gap-3 sm:gap-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-4' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+            {books.map((book) => {
+              const bookId = book.id || book.bookId;
+              // Use getBookValue which handles both bookDistributions and standard columns
+              const value = getBookValue(currentUserProfile, bookId);
+              const color = book.color || 'text-gray-600';
+              return (
+                <div key={bookId} className="text-center">
+                  <p className={`text-xl sm:text-2xl font-bold ${color}`}>{value || 0}</p>
+                  <p className="text-xs text-gray-600 truncate">{book.name}</p>
+                </div>
+              );
+            })}
+            <div className="text-center">
+              <p className="text-xl sm:text-2xl font-bold text-purple-600">
+                ₹{currentUserProfile.totalMoney.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-600">Total Money</p>
+            </div>
           </div>
-          <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-primary-600">{currentUserProfile.englishGita}</p>
-            <p className="text-xs text-gray-600">English Gita</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-green-600">{currentUserProfile.smallBooks}</p>
-            <p className="text-xs text-gray-600">Small Books</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-purple-600">
-              ₹{currentUserProfile.totalMoney.toLocaleString()}
-            </p>
-            <p className="text-xs text-gray-600">Total Money</p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

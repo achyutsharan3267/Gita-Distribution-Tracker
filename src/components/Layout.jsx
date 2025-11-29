@@ -14,6 +14,7 @@ const Layout = ({ children }) => {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
     { path: '/users', label: 'Devotees', icon: '👥' },
+    { path: '/books-prices', label: 'Books & Prices', icon: '📚' },
     ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: '🔐' }] : []),
   ];
 
