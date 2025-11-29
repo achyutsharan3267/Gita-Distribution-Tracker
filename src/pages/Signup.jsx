@@ -73,8 +73,14 @@ const Signup = () => {
         hindiGita: 0,
         englishGita: 0,
         smallBooks: 0,
+        bhagavatam: 0,
+        chaitanyaCharitamrita: 0,
+        otherBooks: 0,
         totalMoney: 0,
       }, authData.user.id);
+
+      // Refresh store to include new user in all lists
+      await initialize(authData.user.id);
 
       navigate('/');
     } catch (err) {

@@ -211,9 +211,9 @@ const UserList = () => {
                       className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors flex-shrink-0 object-cover"
                     />
                     <div className="flex-1 min-w-0">
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-800 group-hover:text-spiritual-600 transition-colors truncate">
-                      {user.name}
-                    </h3>
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-800 group-hover:text-spiritual-600 transition-colors truncate">
+                              {user.name}
+                            </h3>
                     <div className="space-y-0.5 sm:space-y-1">
                       <p className="text-gray-600 text-xs sm:text-sm truncate">🏛️ {user.other || 'Other'}</p>
                       {user.mobileNumber && (
@@ -344,10 +344,10 @@ const UserList = () => {
                             to={`/user/${user.id}`}
                             className="group"
                           >
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
-                                {user.name}
-                              </p>
+                                    <div className="min-w-0">
+                                      <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
+                                        {user.name}
+                                      </p>
                               {user.mobileNumber && (
                                 <p className="text-xs text-gray-500 truncate">📱 {user.mobileNumber} {user.city && `• ${user.city}`}</p>
                               )}

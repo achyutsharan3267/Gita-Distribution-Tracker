@@ -105,7 +105,12 @@ const UserProfile = () => {
             className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-4 border-white shadow-xl flex-shrink-0"
           />
           <div className="flex-1 text-center md:text-left w-full">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words">{user.name}</h1>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words flex items-center justify-center md:justify-start gap-2 flex-wrap">
+              {user.name}
+              {user.isAdmin && (
+                <span className="text-xs text-gray-500">(Admin)</span>
+              )}
+            </h1>
                     <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
                       {user.city && (
                         <p className="text-base sm:text-lg md:text-xl text-spiritual-100 break-words">📍 {user.city}</p>

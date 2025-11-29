@@ -90,7 +90,46 @@ export const useStore = create((set, get) => ({
 
       if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
       
-      return data ? transformUser(data) : null;
+      if (!data) return null;
+
+      // Check admin status
+      let isAdmin = false;
+      try {
+        // First try direct query
+        const { data: adminData, error: adminError } = await supabase
+          .from('admin_users')
+          .select('id')
+          .eq('auth_user_id', authUserId)
+          .single();
+        
+        if (adminError && adminError.code !== 'PGRST116') {
+          // If RLS blocks, try RPC function
+          console.log('Direct query blocked, trying RPC function');
+          const { data: rpcResult } = await supabase.rpc('is_admin', {
+            user_id: authUserId
+          });
+          isAdmin = rpcResult || false;
+        } else {
+          isAdmin = !!adminData;
+        }
+        console.log('Admin check for user:', authUserId, 'isAdmin:', isAdmin);
+      } catch (err) {
+        console.error('Admin check error:', err);
+        // Try RPC as fallback
+        try {
+          const { data: rpcResult } = await supabase.rpc('is_admin', {
+            user_id: authUserId
+          });
+          isAdmin = rpcResult || false;
+        } catch (rpcErr) {
+          console.error('RPC also failed:', rpcErr);
+        }
+      }
+
+      return {
+        ...transformUser(data),
+        isAdmin,
+      };
     } catch (error) {
       console.error('Error fetching current user profile:', error);
       return null;
@@ -208,11 +247,57 @@ export const useStore = create((set, get) => ({
         activitiesByUser[activity.user_id].push(transformActivity(activity));
       });
 
-      // Transform users and attach activities
-      const transformedUsers = users?.map((user) => ({
-        ...transformUser(user),
-        activities: activitiesByUser[user.id] || [],
-      })) || [];
+      // Fetch admin status for all users
+      let adminMap = {};
+      try {
+        const { data: adminUsers, error: adminError } = await supabase
+          .from('admin_users')
+          .select('auth_user_id');
+        
+        if (adminError) {
+          console.error('Error fetching admin users:', adminError);
+          // Try using RPC function as fallback
+          try {
+            // Use database function to check admin status for each user
+            for (const user of users) {
+              if (user.auth_user_id) {
+                const { data: isAdmin } = await supabase.rpc('is_admin', {
+                  user_id: user.auth_user_id
+                });
+                if (isAdmin) {
+                  adminMap[user.auth_user_id] = true;
+                }
+              }
+            }
+          } catch (rpcError) {
+            console.log('RPC function also failed, continuing without admin badges');
+          }
+        } else if (adminUsers) {
+          console.log('✅ Admin users fetched:', adminUsers.length);
+          // Create a map of auth_user_id to admin status
+          adminUsers.forEach((admin) => {
+            if (admin.auth_user_id) {
+              adminMap[admin.auth_user_id] = true;
+            }
+          });
+          console.log('Admin map:', adminMap);
+        }
+      } catch (err) {
+        console.error('Admin status fetch error:', err);
+      }
+
+      // Transform users and attach activities and admin status
+      const transformedUsers = users?.map((user) => {
+        const isAdmin = adminMap[user.auth_user_id] || false;
+        if (isAdmin) {
+          console.log('Admin found:', user.name, user.auth_user_id);
+        }
+        return {
+          ...transformUser(user),
+          activities: activitiesByUser[user.id] || [],
+          isAdmin,
+        };
+      }) || [];
 
       // Get authenticated user's profile if authUserId provided
       let currentUserProfile = null;
@@ -279,9 +364,25 @@ export const useStore = create((set, get) => ({
 
       if (error) throw error;
 
+      // Check admin status for new user
+      let isAdmin = false;
+      try {
+        if (data.auth_user_id) {
+          const { data: adminData } = await supabase
+            .from('admin_users')
+            .select('id')
+            .eq('auth_user_id', data.auth_user_id)
+            .single();
+          isAdmin = !!adminData;
+        }
+      } catch (err) {
+        // Admin check failed, continue with false
+      }
+
       const newUser = {
         ...transformUser(data),
         activities: [],
+        isAdmin,
       };
 
       set((state) => ({
@@ -509,6 +610,22 @@ export const useStore = create((set, get) => ({
               .select('*')
               .order('date', { ascending: false });
 
+            // Fetch admin status for all users
+            let adminMap = {};
+            try {
+              const { data: adminUsers } = await supabase
+                .from('admin_users')
+                .select('auth_user_id');
+              
+              if (adminUsers) {
+                adminUsers.forEach((admin) => {
+                  adminMap[admin.auth_user_id] = true;
+                });
+              }
+            } catch (err) {
+              console.log('Admin status fetch failed in real-time update');
+            }
+
             // Group activities by user_id
             const activitiesByUser = {};
             activities?.forEach((activity) => {
@@ -518,10 +635,11 @@ export const useStore = create((set, get) => ({
               activitiesByUser[activity.user_id].push(transformActivity(activity));
             });
 
-            // Transform users
+            // Transform users with admin status
             const transformedUsers = users.map((user) => ({
               ...transformUser(user),
               activities: activitiesByUser[user.id] || [],
+              isAdmin: adminMap[user.auth_user_id] || false,
             }));
 
             const currentState = get();

@@ -194,7 +194,9 @@ const AdminDashboard = () => {
                               alt={user.name}
                               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-2 sm:mr-3 flex-shrink-0"
                             />
-                            <span className="font-medium text-sm sm:text-base text-gray-900 truncate max-w-[120px] sm:max-w-none">{user.name}</span>
+                            <span className="font-medium text-sm sm:text-base text-gray-900 truncate max-w-[120px] sm:max-w-none">
+                              {user.name}
+                            </span>
                           </div>
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-gray-600 text-sm sm:text-base hidden sm:table-cell">

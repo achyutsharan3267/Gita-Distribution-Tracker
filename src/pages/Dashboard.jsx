@@ -184,10 +184,10 @@ const Dashboard = () => {
                         to={`/user/${user.id}`}
                         className="group"
                       >
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
-                            {user.name}
-                          </p>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
+                                    {user.name}
+                                  </p>
                           {user.city && (
                             <p className="text-xs text-gray-500 truncate">📍 {user.city}</p>
                           )}
