@@ -1,7 +1,7 @@
 import { useStore } from '../store/useStore';
 import { Link } from 'react-router-dom';
 import { useEffect } from 'react';
-import { getStatsBookValue, mapBookIdToUserProperty } from '../utils/bookMapping';
+import { getStatsBookValue } from '../utils/bookMapping';
 
 const BookBreakdown = () => {
   const totalStats = useStore((state) => state.getTotalStats());
@@ -14,19 +14,19 @@ const BookBreakdown = () => {
   }, [loadBooks]);
 
   const StatCard = ({ title, value, icon, color, isTopSelling = false }) => (
-    <div className={`card p-3 sm:p-4 md:p-6 relative ${isTopSelling ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}`}>
+    <div className={`card p-5 relative ${isTopSelling ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}`}>
       {isTopSelling && (
-        <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1">
+        <div className="absolute -top-2 -right-2 bg-yellow-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
           <span>🏆</span>
           <span>Top Selling</span>
         </div>
       )}
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-gray-600 text-xs sm:text-sm font-medium truncate">{title}</p>
-          <p className={`text-xl sm:text-2xl md:text-3xl font-bold mt-1 sm:mt-2 ${color}`}>{value.toLocaleString()}</p>
+          <p className="text-gray-500 text-xs font-medium truncate mb-1">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
         </div>
-        <div className={`text-2xl sm:text-3xl md:text-4xl ${color} flex-shrink-0 ml-2`}>{icon}</div>
+        <div className="text-3xl flex-shrink-0 ml-3">{icon}</div>
       </div>
     </div>
   );
@@ -51,41 +51,41 @@ const BookBreakdown = () => {
   }).sort((a, b) => b.value - a.value); // Sort by count descending
 
   return (
-    <div className="space-y-4 sm:space-y-6 md:space-y-8">
+    <div className="space-y-5">
       {/* Back Button */}
       <div>
         <Link
           to="/"
-          className="inline-flex items-center text-sm sm:text-base text-spiritual-600 hover:text-spiritual-700 font-medium"
+          className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700 font-medium"
         >
           ← Back to Dashboard
         </Link>
       </div>
 
       {/* Page Header */}
-      <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           Book Distribution Breakdown
         </h1>
-        <p className="text-sm sm:text-base text-gray-600 px-2">Detailed breakdown of all book types distributed</p>
+        <p className="text-sm text-gray-600">Detailed breakdown of all book types distributed</p>
       </div>
 
       {/* Total Books Summary */}
-      <div className="card bg-gradient-to-r from-spiritual-500 to-primary-500 text-white p-4 sm:p-6">
+      <div className="card p-5">
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <p className="text-spiritual-100 text-xs sm:text-sm font-medium">Total Books Distributed</p>
-            <p className="text-2xl sm:text-3xl md:text-4xl font-bold mt-1 sm:mt-2">{totalBooks.toLocaleString()}</p>
-            <p className="text-spiritual-100 text-xs sm:text-sm mt-1">
+            <p className="text-gray-500 text-xs font-medium mb-1">Total Books Distributed</p>
+            <p className="text-3xl font-bold text-gray-900">{totalBooks.toLocaleString()}</p>
+            <p className="text-gray-500 text-xs mt-1">
               Across all book types
             </p>
           </div>
-          <div className="text-4xl sm:text-5xl md:text-6xl flex-shrink-0 ml-2">📚</div>
+          <div className="text-5xl flex-shrink-0 ml-3">📚</div>
         </div>
       </div>
 
       {/* Stats Grid - Sorted by count */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {allBooks.map((book, index) => (
           <StatCard
             key={book.key}
@@ -99,12 +99,12 @@ const BookBreakdown = () => {
       </div>
 
       {/* Percentage Breakdown */}
-      <div className="card p-4 sm:p-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
+      <div className="card p-5">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <span className="mr-2">📊</span>
           Distribution Percentage
         </h2>
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-3">
           {totalBooks > 0 ? (
             <>
               {allBooks.map((book, index) => {
@@ -118,28 +118,28 @@ const BookBreakdown = () => {
                 return (
                   <div 
                     key={book.key} 
-                    className={`flex items-center justify-between ${isTopSelling ? 'bg-yellow-50 border-2 border-yellow-400 rounded-lg p-3 sm:p-4' : ''}`}
+                    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${isTopSelling ? 'bg-yellow-50 border-2 border-yellow-400 rounded-xl p-4' : 'p-3'}`}
                   >
-                    <div className="flex items-center space-x-2 sm:space-x-3">
-                      <span className="text-xl sm:text-2xl">{book.icon}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm sm:text-base font-medium text-gray-700">{displayName}</span>
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <span className="text-2xl flex-shrink-0">{book.icon}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-gray-700 truncate">{displayName}</span>
                         {isTopSelling && (
-                          <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="bg-yellow-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0">
                             <span>🏆</span>
                             <span>Top</span>
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 sm:space-x-3">
-                      <div className="w-32 sm:w-48 h-3 sm:h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="flex items-center space-x-3 flex-shrink-0 w-full sm:w-auto">
+                      <div className="flex-1 sm:w-32 sm:flex-none h-2.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${book.bgColor} rounded-full transition-all`}
+                          className="h-full bg-primary-600 rounded-full transition-all"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
-                      <span className={`text-sm sm:text-base font-semibold ${book.color} min-w-[50px] text-right`}>
+                      <span className="text-sm font-semibold text-gray-900 min-w-[45px] text-right">
                         {percentage}%
                       </span>
                     </div>
@@ -148,7 +148,7 @@ const BookBreakdown = () => {
               })}
             </>
           ) : (
-            <p className="text-center text-gray-500 py-4">No books distributed yet</p>
+            <p className="text-center text-gray-400 py-4 text-sm">No books distributed yet</p>
           )}
         </div>
       </div>

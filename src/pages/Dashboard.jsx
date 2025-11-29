@@ -1,7 +1,43 @@
 import { useStore } from '../store/useStore';
 import { Link, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getBookValue, getStatsBookValue } from '../utils/bookMapping';
+
+// Prabhupada ji's quotes about book distribution
+const quotes = [
+  {
+    text: "Books are the basis. Books are the foundation. Without books, there is no question of preaching.",
+    source: "Srila Prabhupada"
+  },
+  {
+    text: "The book distribution is the most important function. If you can distribute books, then you are doing the best service.",
+    source: "Srila Prabhupada"
+  },
+  {
+    text: "Book distribution is the most important activity. If you can distribute books, then you are doing the best service to Krishna.",
+    source: "Srila Prabhupada"
+  },
+  {
+    text: "The more books you distribute, the more you become Krishna conscious. That is the secret.",
+    source: "Srila Prabhupada"
+  },
+  {
+    text: "Books are the most important thing. Without books, there is no question of preaching. Books are the basis.",
+    source: "Srila Prabhupada"
+  },
+  {
+    text: "If you can distribute books, then you are doing the best service. Book distribution is the most important function.",
+    source: "Srila Prabhupada"
+  },
+  {
+    text: "The book distribution is the most important activity. If you can distribute books, then you are doing the best service.",
+    source: "Srila Prabhupada"
+  },
+  {
+    text: "Books are the basis. Without books, there is no question of preaching. Books are the foundation.",
+    source: "Srila Prabhupada"
+  }
+];
 
 const Dashboard = () => {
   const totalStats = useStore((state) => state.getTotalStats());
@@ -9,7 +45,20 @@ const Dashboard = () => {
   const activeDevotees = useStore((state) => state.getActiveDevotees());
   const books = useStore((state) => state.books);
   const loadBooks = useStore((state) => state.loadBooks);
+  const currentUserProfile = useStore((state) => state.currentUserProfile);
   const navigate = useNavigate();
+
+  const [currentQuote, setCurrentQuote] = useState(quotes[0]);
+
+  // Rotate quotes every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * quotes.length);
+      setCurrentQuote(quotes[randomIndex]);
+    }, 10000); // Change quote every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Load books on mount
   useEffect(() => {
@@ -29,140 +78,271 @@ const Dashboard = () => {
   }, 0);
 
   return (
-    <div className="space-y-4 sm:space-y-6 md:space-y-8">
-      {/* Page Header */}
-      <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
-          Distribution Dashboard
+    <div className="space-y-5">
+      {/* Greeting Section */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+          Hare Krishna {currentUserProfile?.name?.split(' ')[0] || 'Devotee'} 👋
         </h1>
-        <p className="text-sm sm:text-base text-gray-600 px-2">Track the divine service of book distribution</p>
+        <p className="text-sm text-gray-600">
+          Every book distributed brings us closer to spreading divine knowledge.
+        </p>
       </div>
 
-      {/* Total Books Count Card - Clickable */}
-      <div 
-        onClick={() => navigate('/books')}
-        className="card p-4 sm:p-6 cursor-pointer hover:shadow-xl transition-all duration-200 bg-gradient-to-br from-spiritual-50 to-primary-50 border border-spiritual-200"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex-1 min-w-0">
-            <p className="text-gray-600 text-xs sm:text-sm font-medium mb-1">Total Books Distributed</p>
-            <p className="text-3xl sm:text-4xl md:text-5xl font-bold mt-2 text-spiritual-600">
-              {totalBooks.toLocaleString()}
-            </p>
-            <p className="text-xs sm:text-sm text-gray-500 mt-2">
-              Click to view detailed breakdown →
-            </p>
+      {/* User's Personal Stats - Only if logged in */}
+      {currentUserProfile && (
+        <div className="card p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-gray-900">Your Contribution</h2>
+            <span className="text-2xl">🙏</span>
           </div>
-          <div className="text-5xl sm:text-6xl md:text-7xl flex-shrink-0 ml-4">📚</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="bg-white/60 rounded-xl p-4 hover:bg-white/80 transition-colors">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">📚</span>
+                <p className="text-xs text-gray-600 font-medium">Your Books</p>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {books.reduce((sum, book) => {
+                  const bookId = book.id || book.bookId;
+                  return sum + getBookValue(currentUserProfile, bookId);
+                }, 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Total distributed</p>
+            </div>
+            <div className="bg-white/60 rounded-xl p-4 hover:bg-white/80 transition-colors">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">💰</span>
+                <p className="text-xs text-gray-600 font-medium">Your Money</p>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                ₹{currentUserProfile.totalMoney.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Total collected</p>
+            </div>
+            <div className="col-span-2 sm:col-span-1 bg-white/60 rounded-xl p-4 hover:bg-white/80 transition-colors">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">🏆</span>
+                <p className="text-xs text-gray-600 font-medium">Your Rank</p>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {(() => {
+                  const rankIndex = leaderboard.findIndex(u => u.id === currentUserProfile.id);
+                  return rankIndex >= 0 ? `#${rankIndex + 1}` : '—';
+                })()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Leaderboard position</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Total Books Card - Clickable */}
+        <div 
+          onClick={() => navigate('/books')}
+          className="card p-5 cursor-pointer active:scale-[0.98] transition-all duration-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Books Distributed</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {totalBooks.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Tap to see breakdown →</p>
+            </div>
+            <span className="text-4xl">📚</span>
+          </div>
+        </div>
+
+        {/* Active Devotees Card */}
+        <div className="card p-5 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Active Devotees</p>
+              <p className="text-3xl font-bold text-gray-900">{activeDevotees.length}</p>
+              <p className="text-xs text-gray-500 mt-1">Actively distributing</p>
+            </div>
+            <span className="text-4xl">🕉️</span>
+          </div>
+        </div>
+
+        {/* Total Money Collected Card */}
+        <div className="card p-5 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Total Money Collected</p>
+              <p className="text-3xl font-bold text-gray-900">
+                ₹{totalStats.totalMoney.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">From all distributions</p>
+            </div>
+            <span className="text-4xl">💰</span>
+          </div>
+        </div>
+
+        {/* Average per Devotee */}
+        <div className="card p-5 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Avg Books per Devotee</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {activeDevotees.length > 0 ? Math.round(totalBooks / activeDevotees.length) : 0}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Average distribution</p>
+            </div>
+            <span className="text-4xl">📊</span>
+          </div>
         </div>
       </div>
 
-      {/* Active Devotees Count */}
-      <div className="card bg-gradient-to-r from-spiritual-500 to-primary-500 text-white p-4 sm:p-6">
-        <div className="flex items-center justify-between">
+      {/* Book Type Breakdown - Quick View */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Book Distribution Overview</h2>
+          <Link 
+            to="/books"
+            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+          >
+            View All →
+          </Link>
+        </div>
+        {books.length === 0 ? (
+          <p className="text-center text-gray-400 py-4 text-sm">Loading books...</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {books.slice(0, 6).map((book) => {
+              const bookId = book.id || book.bookId;
+              const value = getStatsBookValue(totalStats, bookId);
+              const percentage = totalBooks > 0 ? ((value / totalBooks) * 100).toFixed(0) : 0;
+              return (
+                <div key={bookId} className="bg-gray-50 rounded-xl p-3 text-center hover:bg-gray-100 transition-colors">
+                  <div className="text-2xl mb-1">{book.icon || '📖'}</div>
+                  <p className="text-base font-bold text-gray-900">{value}</p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{book.name.split(' ')[0]}</p>
+                  <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary-600 rounded-full transition-all"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{percentage}%</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Inspirational Quote Section */}
+      <div className="card p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 text-3xl">📖</div>
           <div className="flex-1 min-w-0">
-            <p className="text-spiritual-100 text-xs sm:text-sm font-medium">Active Devotees</p>
-            <p className="text-2xl sm:text-3xl md:text-4xl font-bold mt-1 sm:mt-2">{activeDevotees.length}</p>
-            <p className="text-spiritual-100 text-xs sm:text-sm mt-1">
-              Devotees actively distributing books
+            <p className="text-sm font-medium text-gray-700 italic leading-relaxed mb-2">
+              "{currentQuote.text}"
+            </p>
+            <p className="text-xs text-gray-500 font-medium">
+              — {currentQuote.source}
             </p>
           </div>
-          <div className="text-4xl sm:text-5xl md:text-6xl flex-shrink-0 ml-2">🕉️</div>
         </div>
       </div>
 
-      {/* Top 3 Leaderboard */}
-      <div className="card p-4 sm:p-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
-          <span className="mr-2">🏆</span>
-          Top 3 Distributors
-        </h2>
+      {/* Top Distributors Section */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Top Distributors</h2>
+          <span className="text-sm text-gray-500">{top3.length}</span>
+        </div>
         {top3.length === 0 ? (
-          <div className="text-center py-8 sm:py-12">
-            <p className="text-gray-500 text-base sm:text-lg">No Devotees found</p>
+          <div className="text-center py-8">
+            <p className="text-gray-400 text-sm">No Devotees found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-            {top3.map((user, index) => (
-            <Link
-              key={user.id}
-              to={`/user/${user.id}`}
-              className="group"
-            >
-              <div className="bg-gradient-to-br from-spiritual-50 to-primary-50 rounded-lg p-4 sm:p-6 text-center transition-transform hover:scale-105 border-2 border-transparent group-hover:border-spiritual-300">
-                <div className="flex justify-center mb-3 sm:mb-4">
-                  <div className="relative">
-                    <img
-                      src={user.photo}
-                      alt={user.name}
-                      className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full border-4 border-white shadow-lg"
-                    />
-                    <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-yellow-400 text-yellow-900 rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm">
-                      {index + 1}
+          <div className="space-y-3">
+            {top3.map((user, index) => {
+              const progress = user.totalDistributed > 0 ? Math.min((user.totalDistributed / Math.max(...top3.map(u => u.totalDistributed))) * 100, 100) : 0;
+              const statusColor = progress >= 70 ? 'bg-primary-500' : progress >= 40 ? 'bg-yellow-400' : 'bg-gray-300';
+              const statusText = progress >= 70 ? 'On track' : progress >= 40 ? 'Needs attention' : 'Getting started';
+              
+              return (
+                <Link
+                  key={user.id}
+                  to={`/user/${user.id}`}
+                  className="block"
+                >
+                  <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                    <div className="flex-shrink-0">
+                      <span className="text-2xl">
+                        {index === 0 ? '🏆' : index === 1 ? '🥈' : '🥉'}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
+                        <p className="text-sm font-bold text-gray-900">{user.totalDistributed} books</p>
+                      </div>
+                      <div className="progress-bar mb-1">
+                        <div 
+                          className={`progress-fill ${statusColor}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">{statusText}</span>
+                        <span className="text-xs text-gray-500">{Math.round(progress)}%</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-1 truncate px-2">{user.name}</h3>
-                <p className="text-gray-600 text-xs sm:text-sm mb-1 truncate px-2">
-                  🏛️ {user.other || 'Other'}
-                </p>
-                {user.city && (
-                  <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 truncate px-2">📍 {user.city}</p>
-                )}
-                <div className="bg-white rounded-lg p-2 sm:p-3 mt-2 sm:mt-3">
-                  <p className="text-xl sm:text-2xl font-bold text-spiritual-600">
-                    {user.totalDistributed}
-                  </p>
-                  <p className="text-xs text-gray-600">Total Books</p>
-                </div>
-              </div>
-            </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
 
       {/* Top 10 Leaderboard */}
-      <div className="card p-4 sm:p-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
-          <span className="mr-2">📋</span>
-          <span className="hidden sm:inline">Top 10 Devotees Leaderboard</span>
-          <span className="sm:hidden">Top 10 Leaderboard</span>
-        </h2>
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Top 10 Leaderboard</h2>
+          <span className="text-sm text-gray-500">{top10.length}</span>
+        </div>
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 rounded-xl">
           <div className="inline-block min-w-full align-middle">
-            <table className="min-w-[950px] sm:min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">#</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-center text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Rank</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[120px]">Devotee</th>
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase whitespace-nowrap min-w-[100px]">Bace</th>
+            <table className="min-w-[950px] sm:min-w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Rank</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">Devotee</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[100px]">Bace</th>
                   {books.map((book) => {
                     const bookId = book.id || book.bookId;
                     return (
-                      <th key={bookId} className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">
+                      <th key={bookId} className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         {book.name.split(' ')[0]}
                       </th>
                     );
                   })}
-                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase whitespace-nowrap">Total</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100">
                 {top10.length === 0 ? (
                   <tr>
-                    <td colSpan={5 + books.length} className="py-8 sm:py-12 text-center">
-                      <p className="text-gray-500 text-base sm:text-lg">No Devotees found</p>
+                    <td colSpan={5 + books.length} className="py-12 text-center">
+                      <p className="text-gray-400 text-base font-medium">No Devotees found</p>
                     </td>
                   </tr>
                 ) : (
                   top10.map((user, index) => (
                   <tr
                     key={user.id}
-                    className="border-b border-gray-100 hover:bg-spiritual-50 transition-colors"
+                    className="hover:bg-gray-50 transition-colors duration-150"
                   >
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
                       <Link
                         to={`/user/${user.id}`}
                         className="flex justify-center group"
@@ -170,52 +350,52 @@ const Dashboard = () => {
                         <img
                           src={user.photo}
                           alt={user.name}
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-spiritual-200 group-hover:border-spiritual-400 transition-colors flex-shrink-0"
+                          className="w-10 h-10 rounded-full border-2 border-gray-200 group-hover:border-primary-500 transition-colors duration-200 flex-shrink-0"
                         />
                       </Link>
                     </td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
                       <span
-                        className={`inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full font-bold text-xs sm:text-sm ${
+                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-semibold text-xs ${
                           index === 0
-                            ? 'bg-yellow-400 text-yellow-900'
+                            ? 'bg-yellow-500 text-white'
                             : index === 1
                             ? 'bg-gray-300 text-gray-800'
                             : index === 2
-                            ? 'bg-orange-300 text-orange-900'
+                            ? 'bg-orange-400 text-white'
                             : 'bg-gray-200 text-gray-700'
                         }`}
                       >
                         {index + 1}
                       </span>
                     </td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap min-w-[120px]">
+                    <td className="px-4 py-4 whitespace-nowrap min-w-[120px]">
                       <Link
                         to={`/user/${user.id}`}
                         className="group"
                       >
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-sm sm:text-base text-gray-800 group-hover:text-spiritual-600 truncate">
-                                    {user.name}
-                                  </p>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-gray-900 group-hover:text-primary-600 truncate transition-colors">
+                            {user.name}
+                          </p>
                           {user.city && (
-                            <p className="text-xs text-gray-500 truncate">📍 {user.city}</p>
+                            <p className="text-xs text-gray-500 truncate mt-0.5">📍 {user.city}</p>
                           )}
                         </div>
                       </Link>
                     </td>
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-left font-medium text-sm sm:text-base whitespace-nowrap min-w-[100px]">
-                      <span className="text-gray-800">🏛️ {user.other || 'Other'}</span>
+                    <td className="px-4 py-4 text-left font-medium text-sm whitespace-nowrap min-w-[100px]">
+                      <span className="text-gray-700">🏛️ {user.other || 'Other'}</span>
                     </td>
                     {books.map((book) => {
                       const bookId = book.id || book.bookId;
                       return (
-                        <td key={bookId} className="px-3 sm:px-4 py-3 sm:py-4 text-right font-medium text-sm sm:text-base whitespace-nowrap">
+                        <td key={bookId} className="px-4 py-4 text-right font-medium text-sm whitespace-nowrap text-gray-700">
                           {getBookValue(user, bookId)}
                         </td>
                       );
                     })}
-                    <td className="px-3 sm:px-4 py-3 sm:py-4 text-right font-bold text-sm sm:text-base text-spiritual-600 whitespace-nowrap">
+                    <td className="px-4 py-4 text-right font-semibold text-sm text-gray-900 whitespace-nowrap">
                       {user.totalDistributed}
                     </td>
                   </tr>
@@ -225,16 +405,39 @@ const Dashboard = () => {
             </table>
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2 sm:hidden text-center">← Swipe to see all columns →</p>
+        <p className="text-xs text-gray-400 mt-3 sm:hidden text-center font-medium">← Swipe to see all columns →</p>
       </div>
 
-      {/* Quick Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+      {/* Quick Actions Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Link
           to="/users"
-          className="btn-secondary text-center text-base sm:text-lg py-2.5 sm:py-3"
+          className="card p-5 hover:shadow-md transition-all active:scale-[0.98] cursor-pointer group"
         >
-          👥 View All Devotees
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                👥 View All Devotees
+              </p>
+              <p className="text-xs text-gray-500 mt-1">See complete list</p>
+            </div>
+            <span className="text-2xl group-hover:scale-110 transition-transform">→</span>
+          </div>
+        </Link>
+        
+        <Link
+          to="/books"
+          className="card p-5 hover:shadow-md transition-all active:scale-[0.98] cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                📊 Book Breakdown
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Detailed statistics</p>
+            </div>
+            <span className="text-2xl group-hover:scale-110 transition-transform">→</span>
+          </div>
         </Link>
       </div>
     </div>

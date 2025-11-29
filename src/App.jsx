@@ -91,10 +91,22 @@ function AppContent() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-bounce">🕉️</div>
-          <p className="text-xl text-gray-700 font-semibold">Loading...</p>
-          <p className="text-sm text-gray-500 mt-2">Checking authentication</p>
+        <div className="text-center max-w-md px-4">
+          <img 
+            src="/prabhupada-loading.png" 
+            alt="Srila Prabhupada" 
+            className="w-48 h-48 mx-auto mb-6 object-contain animate-pulse"
+            onError={(e) => {
+              // Fallback to emoji if image not found
+              e.target.style.display = 'none';
+              const fallback = e.target.nextElementSibling;
+              if (fallback) fallback.classList.remove('hidden');
+            }}
+          />
+          <div className="text-6xl mb-4 animate-bounce hidden">🕉️</div>
+          <p className="text-lg text-gray-700 font-medium italic leading-relaxed">
+            "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
+          </p>
         </div>
       </div>
     );
@@ -105,9 +117,21 @@ function AppContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50 px-4">
         <div className="max-w-md w-full text-center">
-          <div className="text-6xl mb-4 animate-bounce">🕉️</div>
-          <p className="text-xl text-gray-700 font-semibold">Loading data...</p>
-          <p className="text-sm text-gray-500 mt-2">Connecting to database</p>
+          <img 
+            src="/prabhupada-loading.png" 
+            alt="Srila Prabhupada" 
+            className="w-48 h-48 mx-auto mb-6 object-contain animate-pulse"
+            onError={(e) => {
+              // Fallback to emoji if image not found
+              e.target.style.display = 'none';
+              const fallback = e.target.nextElementSibling;
+              if (fallback) fallback.classList.remove('hidden');
+            }}
+          />
+          <div className="text-6xl mb-4 animate-bounce hidden">🕉️</div>
+          <p className="text-lg text-gray-700 font-medium italic leading-relaxed">
+            "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
+          </p>
         </div>
       </div>
     );

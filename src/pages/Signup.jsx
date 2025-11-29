@@ -93,18 +93,18 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🕉️</div>
-          <h1 className="text-4xl font-bold text-spiritual-800 mb-2">Create Account</h1>
-          <p className="text-gray-600">Join the distribution service</p>
+          <div className="text-5xl mb-4">🕉️</div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-1">Create Account</h1>
+          <p className="text-sm text-gray-600">Join the distribution service</p>
         </div>
 
-        <div className="card">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="card p-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
@@ -183,7 +183,7 @@ const Signup = () => {
                     <img
                       src={photoPreview}
                       alt="Preview"
-                      className="w-24 h-24 rounded-full object-cover border-2 border-spiritual-300"
+                      className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
                     />
                   </div>
                 )}
@@ -264,16 +264,16 @@ const Signup = () => {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-5 text-center">
             <p className="text-gray-600 text-sm">
               Already have an account?{' '}
-              <Link to="/login" className="text-spiritual-600 hover:text-spiritual-700 font-semibold">
+              <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
                 Sign in
               </Link>
             </p>

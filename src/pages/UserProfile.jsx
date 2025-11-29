@@ -130,39 +130,39 @@ const UserProfile = () => {
       </div>
 
       {/* Profile Header */}
-      <div className="card bg-gradient-to-r from-spiritual-500 to-primary-500 text-white p-4 sm:p-6">
+      <div className="card p-5">
         <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
           <img
             src={user.photo}
             alt={user.name}
-            className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-4 border-white shadow-xl flex-shrink-0"
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gray-200 flex-shrink-0 object-cover"
           />
           <div className="flex-1 text-center md:text-left w-full">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words flex items-center justify-center md:justify-start gap-2 flex-wrap">
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2 break-words flex items-center justify-center md:justify-start gap-2 flex-wrap">
               {user.name}
               {user.isAdmin && (
-                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-600 text-white">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-900 text-white">
                   Admin
                 </span>
               )}
             </h1>
-                    <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
-                      {user.city && (
-                        <p className="text-base sm:text-lg md:text-xl text-spiritual-100 break-words">📍 {user.city}</p>
-                      )}
-                      {user.mobileNumber && (
-                        <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">📱 {formatMobileNumber(user.mobileNumber, isAdmin, isOwnProfile)}</p>
-                      )}
-                      <p className="text-sm sm:text-base md:text-lg text-spiritual-100 break-words">🏛️ {user.other || 'Other'}</p>
-                    </div>
-            <div className="flex flex-wrap gap-3 sm:gap-4 justify-center md:justify-start">
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2">
-                <p className="text-xs sm:text-sm text-spiritual-100">Total Books</p>
-                <p className="text-xl sm:text-2xl font-bold">{totalDistributed}</p>
+            <div className="space-y-1 mb-4">
+              {user.city && (
+                <p className="text-sm text-gray-600 break-words">📍 {user.city}</p>
+              )}
+              {user.mobileNumber && (
+                <p className="text-sm text-gray-600 break-words">📱 {formatMobileNumber(user.mobileNumber, isAdmin, isOwnProfile)}</p>
+              )}
+              <p className="text-sm text-gray-600 break-words">🏛️ {user.other || 'Other'}</p>
+            </div>
+            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
+                <p className="text-xs text-gray-500 mb-0.5">Total Books</p>
+                <p className="text-xl font-bold text-gray-900">{totalDistributed}</p>
               </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2">
-                <p className="text-xs sm:text-sm text-spiritual-100">Money Collected</p>
-                <p className="text-xl sm:text-2xl font-bold">₹{user.totalMoney.toLocaleString()}</p>
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
+                <p className="text-xs text-gray-500 mb-0.5">Money Collected</p>
+                <p className="text-xl font-bold text-gray-900">₹{user.totalMoney.toLocaleString()}</p>
               </div>
             </div>
           </div>
@@ -170,18 +170,16 @@ const UserProfile = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className={`grid gap-3 sm:gap-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+      <div className={`grid gap-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
         {books.map((book) => {
           const bookId = book.id || book.bookId;
           const value = getBookValue(user, bookId);
-          const bgColor = book.bgColor ? book.bgColor.replace('bg-', 'bg-').replace('-600', '-50') : 'bg-gray-50';
-          const borderColor = book.bgColor ? book.bgColor.replace('bg-', 'border-').replace('-600', '-200') : 'border-gray-200';
           return (
-            <div key={bookId} className={`card ${bgColor} border-2 ${borderColor} p-3 sm:p-4`}>
+            <div key={bookId} className="card p-4">
               <div className="text-center">
-                <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">{book.icon || '📖'}</div>
+                <div className="text-2xl mb-2">{book.icon || '📖'}</div>
                 <p className="text-gray-600 text-xs font-medium mb-1 break-words">{book.name}</p>
-                <p className={`text-xl sm:text-2xl font-bold ${book.color || 'text-gray-600'}`}>
+                <p className="text-lg font-bold text-gray-900">
                   {value}
                 </p>
               </div>
@@ -191,27 +189,36 @@ const UserProfile = () => {
       </div>
 
       {/* Activity History */}
-      <div className="card p-4 sm:p-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
-          <span className="mr-2">📅</span>
-          <span className="hidden sm:inline">Distribution Activity History</span>
-          <span className="sm:hidden">Activity History</span>
-        </h2>
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <span className="mr-2">📅</span>
+            Activity History
+          </h2>
+          {isOwnProfile && (
+            <button
+              onClick={handleSubmitDistribution}
+              className="btn-primary text-sm py-2 px-4"
+            >
+              ➕ Add
+            </button>
+          )}
+        </div>
 
         {sortedActivities.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>No distribution activities recorded yet.</p>
+          <div className="text-center py-8">
+            <p className="text-gray-400 text-sm mb-4">No distribution activities recorded yet.</p>
             {isOwnProfile && (
               <button
                 onClick={handleSubmitDistribution}
-                className="btn-primary mt-4 inline-block"
+                className="btn-primary text-sm py-2.5 px-5"
               >
                 Submit Your First Distribution
               </button>
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {mergedActivities.map((mergedActivity) => {
               const totalBooks = books.reduce((sum, book) => {
                 const bookId = book.id || book.bookId;
@@ -222,40 +229,39 @@ const UserProfile = () => {
               return (
                 <div
                   key={mergedActivity.date}
-                  className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:bg-spiritual-50 transition-colors"
+                  className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-800 text-base sm:text-lg break-words">
+                      <p className="font-semibold text-gray-900 text-base break-words">
                         {formatDate(mergedActivity.date)}
                       </p>
                       {hasMultipleEntries && (
-                        <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                           {mergedActivity.entryCount} entries merged
                         </p>
                       )}
                     </div>
                     <div className="text-left sm:text-right flex-shrink-0">
-                      <p className="text-xl sm:text-2xl font-bold text-spiritual-600">
+                      <p className="text-lg font-bold text-gray-900">
                         {totalBooks} books
                       </p>
                       {mergedActivity.moneyReceived > 0 && (
-                        <p className="text-xs sm:text-sm text-gray-600">
+                        <p className="text-xs text-gray-600 mt-0.5">
                           ₹{mergedActivity.moneyReceived.toLocaleString()}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className={`grid gap-2 sm:gap-3 mb-3 sm:mb-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+                  <div className={`grid gap-2 mb-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
                     {books.map((book) => {
                       const bookId = book.id || book.bookId;
                       const value = mergedActivity.bookValues?.[bookId] || 0;
-                      const bgColor = book.bgColor ? book.bgColor.replace('bg-', 'bg-').replace('-600', '-50') : 'bg-gray-50';
                       return (
-                        <div key={bookId} className={`${bgColor} rounded-lg p-2`}>
-                          <p className="text-xs text-gray-600 mb-1 break-words">{book.name}</p>
-                          <p className={`text-lg font-bold ${book.color || 'text-gray-600'}`}>
+                        <div key={bookId} className="bg-gray-50 rounded-xl p-2.5">
+                          <p className="text-xs text-gray-500 mb-1 break-words">{book.name}</p>
+                          <p className="text-base font-semibold text-gray-900">
                             {value}
                           </p>
                         </div>
@@ -264,26 +270,26 @@ const UserProfile = () => {
                   </div>
 
                   {mergedActivity.moneyReceived > 0 && (
-                    <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4">
-                      <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">
-                        Money Details:
+                    <div className="border-t border-gray-100 pt-3 mt-3">
+                      <p className="text-xs font-medium text-gray-500 mb-2">
+                        Money Details
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                        <div className="bg-purple-50 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 mb-1">Total Received</p>
-                          <p className="font-bold text-purple-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="bg-gray-50 rounded-xl p-3">
+                          <p className="text-xs text-gray-500 mb-0.5">Total Received</p>
+                          <p className="font-semibold text-gray-900">
                             ₹{mergedActivity.moneyReceived.toLocaleString()}
                           </p>
                         </div>
-                        <div className="bg-blue-50 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 mb-1">Online</p>
-                          <p className="font-bold text-blue-600">
+                        <div className="bg-gray-50 rounded-xl p-3">
+                          <p className="text-xs text-gray-500 mb-0.5">Online</p>
+                          <p className="font-semibold text-gray-900">
                             ₹{mergedActivity.moneyOnline.toLocaleString()}
                           </p>
                         </div>
-                        <div className="bg-orange-50 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 mb-1">Offline</p>
-                          <p className="font-bold text-orange-600">
+                        <div className="bg-gray-50 rounded-xl p-3">
+                          <p className="text-xs text-gray-500 mb-0.5">Offline</p>
+                          <p className="font-semibold text-gray-900">
                             ₹{mergedActivity.moneyOffline.toLocaleString()}
                           </p>
                         </div>
@@ -299,10 +305,10 @@ const UserProfile = () => {
 
       {/* Quick Actions */}
       {isOwnProfile && (
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+        <div className="flex justify-center">
           <button
             onClick={handleSubmitDistribution}
-            className="btn-primary text-center text-base sm:text-lg py-2.5 sm:py-3"
+            className="btn-primary text-sm py-3 px-6"
           >
             📝 Submit New Distribution
           </button>

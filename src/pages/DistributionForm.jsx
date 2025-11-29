@@ -204,46 +204,45 @@ const DistributionForm = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-6 sm:mb-8 px-2">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           Daily Distribution Form
         </h1>
-        <p className="text-sm sm:text-base text-gray-600">Submit your daily book distribution data</p>
+        <p className="text-sm text-gray-600">Submit your daily book distribution data</p>
       </div>
 
       {/* Current User Info */}
-      <div className="card mb-4 sm:mb-6 bg-gradient-to-r from-spiritual-50 to-primary-50 p-4 sm:p-6">
-        <div className="flex items-center space-x-3 sm:space-x-4">
+      <div className="card mb-5 p-5">
+        <div className="flex items-center space-x-3">
           <img
             src={currentUserProfile.photo}
             alt={currentUserProfile.name}
-            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full border-2 border-white shadow-md flex-shrink-0"
+            className="w-14 h-14 rounded-full border-2 border-gray-200 flex-shrink-0 object-cover"
           />
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg sm:text-xl font-bold text-gray-800 truncate">{currentUserProfile.name}</h3>
+            <h3 className="text-base font-semibold text-gray-900 truncate">{currentUserProfile.name}</h3>
             {currentUserProfile.city && (
-              <p className="text-sm sm:text-base text-gray-600 truncate">📍 {currentUserProfile.city}</p>
+              <p className="text-sm text-gray-600 truncate">📍 {currentUserProfile.city}</p>
             )}
-            <p className="text-xs sm:text-sm text-spiritual-600 mt-1">Your Distribution Profile</p>
           </div>
         </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="card space-y-4 sm:space-y-6 p-4 sm:p-6">
+      <form onSubmit={handleSubmit} className="card space-y-5 p-5">
         {errors.general && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
             {errors.general}
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {books.map((book) => {
             const bookId = book.id || book.bookId;
             // Use bookId directly as field name (works for both standard and new books)
             return (
               <div key={bookId}>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   {book.icon ? `${book.icon} ` : ''}{book.name}
                 </label>
                 <input
@@ -252,11 +251,11 @@ const DistributionForm = () => {
                   value={formData[bookId] || ''}
                   onChange={handleChange}
                   min="0"
-                  className="input-field text-sm sm:text-base"
+                  className="input-field"
                   placeholder="0"
                 />
                 {book.description && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-1.5">
                     {book.description}
                   </p>
                 )}
@@ -265,12 +264,12 @@ const DistributionForm = () => {
           })}
         </div>
 
-        <div className="border-t pt-4 sm:pt-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Money Details</h3>
+        <div className="border-t border-gray-100 pt-5">
+          <h3 className="text-base font-semibold text-gray-900 mb-4">Money Details</h3>
           
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-4">
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Total Money Received (₹)
               </label>
               <input
@@ -280,14 +279,14 @@ const DistributionForm = () => {
                 onChange={handleChange}
                 min="0"
                 step="0.01"
-                className="input-field text-sm sm:text-base"
+                className="input-field"
                 placeholder="0.00"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Money Paid Online (₹)
                 </label>
                 <input
@@ -297,13 +296,13 @@ const DistributionForm = () => {
                   onChange={handleChange}
                   min="0"
                   step="0.01"
-                  className="input-field text-sm sm:text-base"
+                  className="input-field"
                   placeholder="0.00"
                 />
               </div>
 
               <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Money Paid Offline (₹)
                 </label>
                 <input
@@ -313,32 +312,32 @@ const DistributionForm = () => {
                   onChange={handleChange}
                   min="0"
                   step="0.01"
-                  className="input-field text-sm sm:text-base"
+                  className="input-field"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
             {errors.moneyMismatch && (
-              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2 rounded-lg text-sm">
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2.5 rounded-xl text-sm">
                 {errors.moneyMismatch}
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary flex-1 text-base sm:text-lg py-2.5 sm:py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Submitting...' : '📝 Submit Distribution'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="btn-secondary flex-1 text-base sm:text-lg py-2.5 sm:py-3"
+            className="btn-secondary flex-1"
           >
             Cancel
           </button>
@@ -346,31 +345,32 @@ const DistributionForm = () => {
       </form>
 
       {/* Current Stats Preview */}
-      <div className="card mt-4 sm:mt-6 bg-gray-50 p-4 sm:p-6">
-        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Your Current Totals</h3>
+      <div className="card mt-5 p-5">
+        <h3 className="text-base font-semibold text-gray-900 mb-4">Your Current Totals</h3>
         {!currentUserProfile ? (
-          <p className="text-center text-gray-500 py-4">Loading profile...</p>
+          <p className="text-center text-gray-400 py-4 text-sm italic">
+            "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
+          </p>
         ) : books.length === 0 ? (
-          <p className="text-center text-gray-500 py-4">Loading books...</p>
+          <p className="text-center text-gray-400 py-4 text-sm">Loading books...</p>
         ) : (
-          <div className={`grid gap-3 sm:gap-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-4' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+          <div className={`grid gap-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-4' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
             {books.map((book) => {
               const bookId = book.id || book.bookId;
               // Use getBookValue which handles both bookDistributions and standard columns
               const value = getBookValue(currentUserProfile, bookId);
-              const color = book.color || 'text-gray-600';
               return (
-                <div key={bookId} className="text-center">
-                  <p className={`text-xl sm:text-2xl font-bold ${color}`}>{value || 0}</p>
-                  <p className="text-xs text-gray-600 truncate">{book.name}</p>
+                <div key={bookId} className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-gray-900">{value || 0}</p>
+                  <p className="text-xs text-gray-500 truncate mt-1">{book.name}</p>
                 </div>
               );
             })}
-            <div className="text-center">
-              <p className="text-xl sm:text-2xl font-bold text-purple-600">
+            <div className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-gray-900">
                 ₹{currentUserProfile.totalMoney.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-600">Total Money</p>
+              <p className="text-xs text-gray-500 mt-1">Total Money</p>
             </div>
           </div>
         )}

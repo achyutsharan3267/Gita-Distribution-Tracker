@@ -43,18 +43,18 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🕉️</div>
-          <h1 className="text-4xl font-bold text-spiritual-800 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your account</p>
+          <div className="text-5xl mb-4">🕉️</div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-1">Welcome Back</h1>
+          <p className="text-sm text-gray-600">Sign in to your account</p>
         </div>
 
-        <div className="card">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="card p-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
@@ -90,16 +90,16 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full text-lg py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-5 text-center">
             <p className="text-gray-600 text-sm">
               Don't have an account?{' '}
-              <Link to="/signup" className="text-spiritual-600 hover:text-spiritual-700 font-semibold">
+              <Link to="/signup" className="text-primary-600 hover:text-primary-700 font-medium">
                 Sign up
               </Link>
             </p>

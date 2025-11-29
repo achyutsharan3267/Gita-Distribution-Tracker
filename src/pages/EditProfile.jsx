@@ -81,9 +81,21 @@ const EditProfile = () => {
   // Show loading state
   if (authLoading || loading || profileLoading || !user) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-12">
-        <div className="text-6xl mb-4 animate-bounce">🕉️</div>
-        <p className="text-gray-600 text-lg">Loading profile...</p>
+      <div className="max-w-2xl mx-auto text-center py-12 px-4">
+        <img 
+          src="/prabhupada-loading.png" 
+          alt="Srila Prabhupada" 
+          className="w-48 h-48 mx-auto mb-6 object-contain animate-pulse"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            const fallback = e.target.nextElementSibling;
+            if (fallback) fallback.classList.remove('hidden');
+          }}
+        />
+        <div className="text-6xl mb-4 animate-bounce hidden">🕉️</div>
+        <p className="text-gray-600 text-lg font-medium italic leading-relaxed">
+          "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
+        </p>
       </div>
     );
   }
@@ -175,23 +187,23 @@ const EditProfile = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-6 sm:mb-8 px-2">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           Edit Profile
         </h1>
-        <p className="text-sm sm:text-base text-gray-600">Update your profile information</p>
+        <p className="text-sm text-gray-600">Update your profile information</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card space-y-4 sm:space-y-6 p-4 sm:p-6">
+      <form onSubmit={handleSubmit} className="card space-y-5 p-5">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
             {error}
           </div>
         )}
 
         {/* Photo Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Profile Photo
           </label>
           <div className="flex flex-col items-center space-y-4">
@@ -199,7 +211,7 @@ const EditProfile = () => {
               <img
                 src={photoPreview || currentUserProfile.photo}
                 alt="Profile"
-                className="w-32 h-32 rounded-full object-cover border-4 border-spiritual-200 shadow-lg"
+                className="w-28 h-28 rounded-full object-cover border-2 border-gray-200"
               />
             </div>
             <div className="w-full">
@@ -302,49 +314,51 @@ const EditProfile = () => {
         </div>
 
         {/* Current Stats (Read-only) */}
-        <div className="border-t pt-4 sm:pt-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Your Current Stats</h3>
+        <div className="border-t border-gray-100 pt-5">
+          <h3 className="text-base font-semibold text-gray-900 mb-4">Your Current Stats</h3>
           {!currentUserProfile ? (
-            <p className="text-center text-gray-500 py-4">Loading profile...</p>
+            <p className="text-center text-gray-400 py-4 text-sm italic">
+              "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
+            </p>
           ) : books.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">Loading books...</p>
+            <p className="text-center text-gray-400 py-4 text-sm italic">
+              "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
+            </p>
           ) : (
-            <div className={`grid gap-3 sm:gap-4 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-4' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+            <div className={`grid gap-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-4' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
               {books.map((book) => {
                 const bookId = book.id || book.bookId;
                 const value = getBookValue(currentUserProfile, bookId);
-                const bgColor = book.bgColor ? book.bgColor.replace('bg-', 'bg-').replace('-600', '-50') : 'bg-gray-50';
-                const color = book.color || 'text-gray-600';
                 return (
-                  <div key={bookId} className={`text-center ${bgColor} rounded-lg p-2 sm:p-3`}>
-                    <p className={`text-xl sm:text-2xl font-bold ${color}`}>{value || 0}</p>
-                    <p className="text-xs text-gray-600 truncate">{book.name}</p>
+                  <div key={bookId} className="bg-gray-50 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-gray-900">{value || 0}</p>
+                    <p className="text-xs text-gray-500 truncate mt-1">{book.name}</p>
                   </div>
                 );
               })}
-              <div className="text-center bg-purple-50 rounded-lg p-2 sm:p-3">
-                <p className="text-xl sm:text-2xl font-bold text-purple-600">
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-lg font-bold text-gray-900">
                   ₹{currentUserProfile.totalMoney.toLocaleString()}
                 </p>
-                <p className="text-xs text-gray-600">Total Money</p>
+                <p className="text-xs text-gray-500 mt-1">Total Money</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100">
           <button
             type="submit"
             disabled={isSubmitting || !currentUserProfile}
-            className="btn-primary flex-1 text-base sm:text-lg py-2.5 sm:py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Updating...' : '💾 Save Changes'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="btn-secondary flex-1 text-base sm:text-lg py-2.5 sm:py-3"
+            className="btn-secondary flex-1"
           >
             Cancel
           </button>
