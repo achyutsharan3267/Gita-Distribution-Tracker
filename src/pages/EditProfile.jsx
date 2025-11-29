@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
@@ -140,7 +141,10 @@ const EditProfile = () => {
       // Refresh store
       await initialize(user.id);
 
-      alert('Profile updated successfully! 🙏');
+      toast.success('Profile updated successfully! 🙏', {
+        position: "top-right",
+        autoClose: 3000,
+      });
       navigate('/');
     } catch (err) {
       console.error('Error updating profile:', err);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { useStore } from '../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -123,7 +124,10 @@ const DistributionForm = () => {
       setIsSubmitting(false);
       
       // Show success message and redirect
-      alert('Distribution data submitted successfully! 🙏');
+      toast.success('Distribution data submitted successfully! 🙏', {
+        position: "top-right",
+        autoClose: 3000,
+      });
       navigate('/');
     } catch (error) {
       setIsSubmitting(false);

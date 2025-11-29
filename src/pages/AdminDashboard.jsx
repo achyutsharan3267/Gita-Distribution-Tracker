@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'react-toastify';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
@@ -27,10 +28,16 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       await deleteUser(userId);
-      alert('User deleted successfully');
+      toast.success('User deleted successfully', {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } catch (err) {
       setError(err.message);
-      alert(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`, {
+        position: "top-right",
+        autoClose: 4000,
+      });
     } finally {
       setLoading(false);
     }
@@ -46,11 +53,18 @@ const AdminDashboard = () => {
       setLoading(true);
       // Note: This requires Supabase Admin API or a database function
       // For now, we'll show a message
-      alert('Password update requires Supabase Admin API. Please use Supabase Dashboard to update passwords.');
+      toast.info('Password update requires Supabase Admin API. Please use Supabase Dashboard to update passwords.', {
+        position: "top-right",
+        autoClose: 4000,
+      });
       setShowPasswordModal(false);
       setNewPassword('');
     } catch (err) {
       setError(err.message);
+      toast.error(`Error: ${err.message}`, {
+        position: "top-right",
+        autoClose: 4000,
+      });
     } finally {
       setLoading(false);
     }
@@ -80,12 +94,18 @@ const AdminDashboard = () => {
         ...editData,
         mobileNumber: editData.mobileNumber,
       });
-      alert('User profile updated successfully');
+      toast.success('User profile updated successfully', {
+        position: "top-right",
+        autoClose: 3000,
+      });
       setShowEditModal(false);
       setSelectedUser(null);
     } catch (err) {
       setError(err.message);
-      alert(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`, {
+        position: "top-right",
+        autoClose: 4000,
+      });
     } finally {
       setLoading(false);
     }

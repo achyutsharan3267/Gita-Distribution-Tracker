@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import * as XLSX from 'xlsx';
 
 const UserList = () => {
   const users = useStore((state) => state.users);
@@ -24,6 +25,59 @@ const UserList = () => {
     });
   }, [leaderboard, searchQuery]);
 
+  // Export to Excel function
+  const exportToExcel = () => {
+    // Prepare data for Excel
+    const excelData = filteredLeaderboard.map((user) => {
+      const totalDistributed = user.hindiGita + user.englishGita + user.smallBooks + (user.bhagavatam || 0) + (user.chaitanyaCharitamrita || 0) + (user.otherBooks || 0);
+      
+      return {
+        'Name': user.name || '',
+        'Email': user.email || '',
+        'Mobile Number': user.mobileNumber || '',
+        'City': user.city || '',
+        'Hindi Gita': user.hindiGita || 0,
+        'English Gita': user.englishGita || 0,
+        'Small Books': user.smallBooks || 0,
+        'Bhagavatam': user.bhagavatam || 0,
+        'Chaitanya Charitamrita': user.chaitanyaCharitamrita || 0,
+        'Other Books': user.otherBooks || 0,
+        'Total Books Distributed': totalDistributed,
+        'Total Money Collected (₹)': user.totalMoney || 0,
+      };
+    });
+
+    // Create workbook and worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Devotees List');
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 20 }, // Name
+      { wch: 25 }, // Email
+      { wch: 15 }, // Mobile Number
+      { wch: 15 }, // City
+      { wch: 12 }, // Hindi Gita
+      { wch: 13 }, // English Gita
+      { wch: 12 }, // Small Books
+      { wch: 12 }, // Bhagavatam
+      { wch: 20 }, // Chaitanya Charitamrita
+      { wch: 12 }, // Other Books
+      { wch: 20 }, // Total Books Distributed
+      { wch: 20 }, // Total Money Collected
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // Generate filename with current date
+    const date = new Date();
+    const dateStr = date.toISOString().split('T')[0];
+    const filename = `Devotees_List_${dateStr}.xlsx`;
+
+    // Write file and trigger download
+    XLSX.writeFile(workbook, filename);
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 md:space-y-8">
       <div className="text-center px-2">
@@ -35,7 +89,7 @@ const UserList = () => {
         </p>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar and Export Button */}
       <div className="card p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
           <div className="flex-1 w-full">
@@ -57,14 +111,27 @@ const UserList = () => {
               </svg>
             </div>
           </div>
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
-            >
-              Clear
-            </button>
-          )}
+          <div className="flex gap-2 sm:gap-3">
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
+              >
+                Clear
+              </button>
+            )}
+            {filteredLeaderboard.length > 0 && (
+              <button
+                onClick={exportToExcel}
+                className="px-3 hidden sm:px-4 py-2 text-xs sm:text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export to Excel
+              </button>
+            )}
+          </div>
         </div>
         {searchQuery && (
           <p className="text-xs sm:text-sm text-gray-500 mt-2">
