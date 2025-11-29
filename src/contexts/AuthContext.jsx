@@ -93,6 +93,27 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (error) throw error;
+      
+      // After successful login, check if user profile exists
+      if (data?.user?.id) {
+        const { data: userProfile, error: profileError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', data.user.id)
+          .single();
+        
+        // If profile doesn't exist, sign out and show error
+        if (profileError || !userProfile) {
+          await supabase.auth.signOut();
+          return { 
+            data: null,
+            error: { 
+              message: 'User account not found. Please sign up again.' 
+            } 
+          };
+        }
+      }
+      
       return { data, error: null };
     } catch (error) {
       return { data: null, error };

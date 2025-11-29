@@ -17,7 +17,7 @@ const Signup = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
-  const { addUser } = useStore();
+  const { addUser, initialize } = useStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -82,7 +82,10 @@ const Signup = () => {
       // Refresh store to include new user in all lists
       await initialize(authData.user.id);
 
-      navigate('/');
+      // Small delay to ensure everything is loaded before redirecting
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 500);
     } catch (err) {
       setError('Account created but profile setup failed. Please try logging in.');
       setLoading(false);

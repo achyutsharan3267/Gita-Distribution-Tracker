@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useStore } from '../store/useStore';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
+  const initialize = useStore((state) => state.initialize);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -15,13 +17,28 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const { error } = await signIn(email, password);
+    const { error, data } = await signIn(email, password);
 
     if (error) {
       setError(error.message);
       setLoading(false);
     } else {
-      navigate('/');
+      // Wait for store to initialize before redirecting
+      if (data?.user?.id) {
+        try {
+          await initialize(data.user.id);
+          // Small delay to ensure everything is loaded
+          setTimeout(() => {
+            navigate('/', { replace: true });
+          }, 500);
+        } catch (err) {
+          console.error('Initialization error:', err);
+          // Still redirect even if initialization fails
+          navigate('/', { replace: true });
+        }
+      } else {
+        navigate('/', { replace: true });
+      }
     }
   };
 

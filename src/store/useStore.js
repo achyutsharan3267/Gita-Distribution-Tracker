@@ -747,8 +747,39 @@ export const useStore = create((set, get) => ({
   },
 
   // Admin functions
-  deleteUser: async (userId) => {
+  deleteUser: async (userId, currentAuthUserId = null) => {
     try {
+      // First, get the user's auth_user_id before deleting
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('auth_user_id')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const authUserId = userData?.auth_user_id;
+      const isDeletingSelf = currentAuthUserId && authUserId === currentAuthUserId;
+
+      // Step 1: Delete from admin_users table if user is admin
+      if (authUserId) {
+        try {
+          const { error: adminDeleteError } = await supabase
+            .from('admin_users')
+            .delete()
+            .eq('auth_user_id', authUserId);
+
+          if (adminDeleteError) {
+            console.warn('Could not delete admin record (may not exist):', adminDeleteError);
+          } else {
+            console.log('✅ Admin record deleted');
+          }
+        } catch (adminErr) {
+          console.warn('Error deleting admin record:', adminErr);
+        }
+      }
+
+      // Step 2: Delete from users table (activities will cascade delete)
       const { error } = await supabase
         .from('users')
         .delete()
@@ -756,12 +787,33 @@ export const useStore = create((set, get) => ({
 
       if (error) throw error;
 
+      // Step 3: Delete from auth.users using RPC function (requires database function)
+      if (authUserId) {
+        try {
+          // Call database function to delete auth user
+          // This function must be created in Supabase with proper permissions
+          const { error: authDeleteError } = await supabase.rpc('delete_auth_user', {
+            user_auth_id: authUserId
+          });
+
+          if (authDeleteError) {
+            console.warn('Could not delete auth user (may require manual deletion):', authDeleteError);
+            console.warn('⚠️ User profile deleted but auth account still exists. User will need to signup again.');
+          } else {
+            console.log('✅ Auth user deleted successfully');
+          }
+        } catch (rpcErr) {
+          console.warn('Error calling delete_auth_user RPC:', rpcErr);
+          console.warn('⚠️ User profile deleted but auth account may still exist. User will need to signup again.');
+        }
+      }
+
       // Update local state
       set((state) => ({
         users: state.users.filter((u) => u.id !== userId),
       }));
 
-      console.log('✅ User deleted successfully');
+      console.log('✅ User deleted successfully from database');
     } catch (error) {
       console.error('Error deleting user:', error);
       throw error;
@@ -820,16 +872,144 @@ export const useStore = create((set, get) => ({
     }
   },
 
-  deleteActivity: async (activityId) => {
+  // Helper function to recalculate user totals from all activities
+  recalculateUserTotals: async (userId) => {
     try {
-      // Get activity to update user totals
-      const { data: activity, error: fetchError } = await supabase
+      // Get all activities for this user
+      const { data: activities, error } = await supabase
         .from('activities')
-        .select('*, users!inner(*)')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      // Sum up all activities
+      const totals = activities.reduce(
+        (acc, activity) => ({
+          hindi_gita: acc.hindi_gita + (activity.hindi_gita || 0),
+          english_gita: acc.english_gita + (activity.english_gita || 0),
+          small_books: acc.small_books + (activity.small_books || 0),
+          bhagavatam: acc.bhagavatam + (activity.bhagavatam || 0),
+          chaitanya_charitamrita: acc.chaitanya_charitamrita + (activity.chaitanya_charitamrita || 0),
+          other_books: acc.other_books + (activity.other_books || 0),
+          total_money: acc.total_money + parseFloat(activity.money_received || 0),
+        }),
+        {
+          hindi_gita: 0,
+          english_gita: 0,
+          small_books: 0,
+          bhagavatam: 0,
+          chaitanya_charitamrita: 0,
+          other_books: 0,
+          total_money: 0,
+        }
+      );
+
+      // Update user totals in database
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(totals)
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      // Reload activities for this user
+      const updatedActivities = await get().loadUserActivities(userId);
+
+      // Update local state
+      set((state) => ({
+        users: state.users.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                hindiGita: totals.hindi_gita,
+                englishGita: totals.english_gita,
+                smallBooks: totals.small_books,
+                bhagavatam: totals.bhagavatam,
+                chaitanyaCharitamrita: totals.chaitanya_charitamrita,
+                otherBooks: totals.other_books,
+                totalMoney: totals.total_money,
+                activities: updatedActivities,
+              }
+            : u
+        ),
+        currentUserProfile: state.currentUserProfile?.id === userId
+          ? {
+              ...state.currentUserProfile,
+              hindiGita: totals.hindi_gita,
+              englishGita: totals.english_gita,
+              smallBooks: totals.small_books,
+              bhagavatam: totals.bhagavatam,
+              chaitanyaCharitamrita: totals.chaitanya_charitamrita,
+              otherBooks: totals.other_books,
+              totalMoney: totals.total_money,
+              activities: updatedActivities,
+            }
+          : state.currentUserProfile,
+      }));
+
+      console.log('✅ User totals recalculated from activities:', totals);
+      return totals;
+    } catch (error) {
+      console.error('Error recalculating user totals:', error);
+      throw error;
+    }
+  },
+
+  updateActivity: async (activityId, updates) => {
+    try {
+      // Get current activity to find user_id
+      const { data: currentActivity, error: fetchError } = await supabase
+        .from('activities')
+        .select('user_id')
         .eq('id', activityId)
         .single();
 
       if (fetchError) throw fetchError;
+
+      const userId = currentActivity.user_id;
+
+      // Update activity in database
+      const { error } = await supabase
+        .from('activities')
+        .update({
+          date: updates.date,
+          hindi_gita: updates.hindiGita || 0,
+          english_gita: updates.englishGita || 0,
+          small_books: updates.smallBooks || 0,
+          bhagavatam: updates.bhagavatam || 0,
+          chaitanya_charitamrita: updates.chaitanyaCharitamrita || 0,
+          other_books: updates.otherBooks || 0,
+          money_received: updates.moneyReceived || 0,
+          money_online: updates.moneyOnline || 0,
+          money_offline: updates.moneyOffline || 0,
+        })
+        .eq('id', activityId);
+
+      if (error) throw error;
+
+      // Recalculate user totals from all activities
+      await get().recalculateUserTotals(userId);
+
+      console.log('✅ Activity updated and user totals recalculated');
+    } catch (error) {
+      console.error('Error updating activity:', error);
+      throw error;
+    }
+  },
+
+  deleteActivity: async (activityId) => {
+    try {
+      // Get activity to find user_id
+      const { data: activity, error: fetchError } = await supabase
+        .from('activities')
+        .select('user_id')
+        .eq('id', activityId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const userId = activity.user_id;
 
       // Delete activity
       const { error } = await supabase
@@ -839,43 +1019,10 @@ export const useStore = create((set, get) => ({
 
       if (error) throw error;
 
-      // Update user totals
-      const user = activity.users;
-      const updatedUser = {
-        hindi_gita: Math.max(0, user.hindi_gita - (activity.hindi_gita || 0)),
-        english_gita: Math.max(0, user.english_gita - (activity.english_gita || 0)),
-        small_books: Math.max(0, user.small_books - (activity.small_books || 0)),
-        bhagavatam: Math.max(0, (user.bhagavatam || 0) - (activity.bhagavatam || 0)),
-        chaitanya_charitamrita: Math.max(0, (user.chaitanya_charitamrita || 0) - (activity.chaitanya_charitamrita || 0)),
-        other_books: Math.max(0, (user.other_books || 0) - (activity.other_books || 0)),
-        total_money: Math.max(0, user.total_money - (activity.money_received || 0)),
-      };
+      // Recalculate user totals from remaining activities
+      await get().recalculateUserTotals(userId);
 
-      await supabase
-        .from('users')
-        .update(updatedUser)
-        .eq('id', user.id);
-
-      // Update local state
-      set((state) => ({
-        users: state.users.map((u) =>
-          u.id === user.id
-            ? {
-                ...u,
-                hindiGita: updatedUser.hindi_gita,
-                englishGita: updatedUser.english_gita,
-                smallBooks: updatedUser.small_books,
-                bhagavatam: updatedUser.bhagavatam,
-                chaitanyaCharitamrita: updatedUser.chaitanya_charitamrita,
-                otherBooks: updatedUser.other_books,
-                totalMoney: updatedUser.total_money,
-                activities: u.activities.filter((a) => a.id !== activityId),
-              }
-            : u
-        ),
-      }));
-
-      console.log('✅ Activity deleted successfully');
+      console.log('✅ Activity deleted and user totals recalculated');
     } catch (error) {
       console.error('Error deleting activity:', error);
       throw error;

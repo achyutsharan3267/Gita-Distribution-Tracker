@@ -1,9 +1,10 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../contexts/AuthContext';
 
 const UserProfile = () => {
   const { userId } = useParams();
+  const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const users = useStore((state) => state.users);
   const currentUserProfile = useStore((state) => state.currentUserProfile);
@@ -11,6 +12,11 @@ const UserProfile = () => {
   
   // Check if viewing own profile
   const isOwnProfile = currentUserProfile && currentUserProfile.id === userId;
+  
+  const handleSubmitDistribution = () => {
+    console.log('Submit Distribution button clicked');
+    navigate('/form');
+  };
 
   if (!user) {
     return (
@@ -108,7 +114,9 @@ const UserProfile = () => {
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words flex items-center justify-center md:justify-start gap-2 flex-wrap">
               {user.name}
               {user.isAdmin && (
-                <span className="text-xs text-gray-500">(Admin)</span>
+                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-600 text-white">
+                  Admin
+                </span>
               )}
             </h1>
                     <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
@@ -208,9 +216,14 @@ const UserProfile = () => {
         {sortedActivities.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <p>No distribution activities recorded yet.</p>
-            <Link to="/form" className="btn-primary mt-4 inline-block">
-              Submit Your First Distribution
-            </Link>
+            {isOwnProfile && (
+              <button
+                onClick={handleSubmitDistribution}
+                className="btn-primary mt-4 inline-block"
+              >
+                Submit Your First Distribution
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -325,11 +338,16 @@ const UserProfile = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-        <Link to="/form" className="btn-primary text-center text-base sm:text-lg py-2.5 sm:py-3">
-          📝 Submit New Distribution
-        </Link>
-      </div>
+      {isOwnProfile && (
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+          <button
+            onClick={handleSubmitDistribution}
+            className="btn-primary text-center text-base sm:text-lg py-2.5 sm:py-3"
+          >
+            📝 Submit New Distribution
+          </button>
+        </div>
+      )}
     </div>
   );
 };
