@@ -43,12 +43,22 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className=" flex items-center justify-center py-4 sm:py-8">
       <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🕉️</div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-1">Welcome Back</h1>
-          <p className="text-sm text-gray-600">Sign in to your account</p>
+        <div className="text-center mb-4 sm:mb-6">
+          <img 
+            src="/prabhupada-loading.png" 
+            alt="Srila Prabhupada" 
+            className="w-24 h-24 sm:w-40 sm:h-40 mx-auto mb-3 sm:mb-4 object-contain"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              const fallback = e.target.nextElementSibling;
+              if (fallback) fallback.classList.remove('hidden');
+            }}
+          />
+          <div className="text-5xl mb-4 hidden">🕉️</div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-1">Hare Krishna</h1>
+          <p className="text-xs sm:text-sm text-gray-600">Sign in to your account</p>
         </div>
 
         <div className="card p-5">
