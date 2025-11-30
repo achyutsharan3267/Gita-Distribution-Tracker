@@ -1810,4 +1810,168 @@ export const useStore = create((set, get) => ({
       throw error;
     }
   },
+
+  // Sadhna functions
+  submitSadhna: async (sadhnaData, userId) => {
+    try {
+      const { error } = await supabase
+        .from('sadhna')
+        .upsert({
+          user_id: userId,
+          date: sadhnaData.date,
+          wake_up_time: sadhnaData.wakeUpTime || null,
+          mangla_arti: sadhnaData.manglaArti || false,
+          tulsi_arti: sadhnaData.tulsiArti || false,
+          guru_puja: sadhnaData.guruPuja || false,
+          sandhya_arti: sadhnaData.sandhyaArti || false,
+          first_round_timing: sadhnaData.firstRoundTiming || null,
+          last_round_timing: sadhnaData.lastRoundTiming || null,
+          total_rounds: sadhnaData.totalRounds || 0,
+          lecture_hearing: sadhnaData.lectureHearing || null,
+          book_reading: sadhnaData.bookReading || null,
+          services_done: sadhnaData.servicesDone || null,
+        }, {
+          onConflict: 'user_id,date',
+        });
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error submitting sadhna:', error);
+      throw error;
+    }
+  },
+
+  getSadhnaForDate: async (userId, date) => {
+    try {
+      const { data, error } = await supabase
+        .from('sadhna')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+      
+      if (!data) return null;
+
+      return {
+        id: data.id,
+        wakeUpTime: data.wake_up_time || '',
+        manglaArti: data.mangla_arti || false,
+        tulsiArti: data.tulsi_arti || false,
+        guruPuja: data.guru_puja || false,
+        sandhyaArti: data.sandhya_arti || false,
+        firstRoundTiming: data.first_round_timing || '',
+        lastRoundTiming: data.last_round_timing || '',
+        totalRounds: data.total_rounds || 0,
+        lectureHearing: data.lecture_hearing || '',
+        bookReading: data.book_reading || '',
+        servicesDone: data.services_done || '',
+        date: data.date,
+      };
+    } catch (error) {
+      console.error('Error fetching sadhna:', error);
+      throw error;
+    }
+  },
+
+  getAllSadhna: async () => {
+    try {
+      // Fetch sadhna with user info
+      const { data: sadhnaData, error } = await supabase
+        .from('sadhna')
+        .select(`
+          *,
+          users!inner (
+            id,
+            name,
+            photo,
+            auth_user_id
+          )
+        `)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch emails separately using RPC function
+      let emailMap = {};
+      try {
+        const { data: emailsData } = await supabase.rpc('get_users_with_email').catch(() => null);
+        if (emailsData) {
+          emailsData.forEach((item) => {
+            if (item.id && item.email) {
+              emailMap[item.id] = item.email;
+            }
+          });
+        }
+      } catch (err) {
+        console.log('Email fetch not available for sadhna, continuing without email');
+      }
+
+      // Transform the data
+      return sadhnaData.map((sadhna) => {
+        const user = sadhna.users;
+        const email = emailMap[user?.id] || null;
+
+        return {
+          id: sadhna.id,
+          userId: sadhna.user_id,
+          userName: user?.name || 'Unknown',
+          userPhoto: user?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=a855f7&color=fff&size=128`,
+          userEmail: email,
+          date: sadhna.date,
+          wakeUpTime: sadhna.wake_up_time || '',
+          manglaArti: sadhna.mangla_arti || false,
+          tulsiArti: sadhna.tulsi_arti || false,
+          guruPuja: sadhna.guru_puja || false,
+          sandhyaArti: sadhna.sandhya_arti || false,
+          firstRoundTiming: sadhna.first_round_timing || '',
+          lastRoundTiming: sadhna.last_round_timing || '',
+          totalRounds: sadhna.total_rounds || 0,
+          lectureHearing: sadhna.lecture_hearing || '',
+          bookReading: sadhna.book_reading || '',
+          servicesDone: sadhna.services_done || '',
+          createdAt: sadhna.created_at,
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching all sadhna:', error);
+      throw error;
+    }
+  },
+
+  getUserSadhna: async (userId) => {
+    try {
+      const { data: sadhnaData, error } = await supabase
+        .from('sadhna')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      return sadhnaData.map((sadhna) => ({
+        id: sadhna.id,
+        date: sadhna.date,
+        wakeUpTime: sadhna.wake_up_time || '',
+        manglaArti: sadhna.mangla_arti || false,
+        tulsiArti: sadhna.tulsi_arti || false,
+        guruPuja: sadhna.guru_puja || false,
+        sandhyaArti: sadhna.sandhya_arti || false,
+        firstRoundTiming: sadhna.first_round_timing || '',
+        lastRoundTiming: sadhna.last_round_timing || '',
+        totalRounds: sadhna.total_rounds || 0,
+        lectureHearing: sadhna.lecture_hearing || '',
+        bookReading: sadhna.book_reading || '',
+        servicesDone: sadhna.services_done || '',
+        createdAt: sadhna.created_at,
+      }));
+    } catch (error) {
+      console.error('Error fetching user sadhna:', error);
+      throw error;
+    }
+  },
 }));

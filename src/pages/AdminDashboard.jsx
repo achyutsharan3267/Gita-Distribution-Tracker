@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { getBookValue, getStatsBookValue, getActivityBookValue } from '../utils/bookMapping';
+import * as XLSX from 'xlsx';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ const AdminDashboard = () => {
   const loadBooks = useStore((state) => state.loadBooks);
   const addBook = useStore((state) => state.addBook);
   const deleteBook = useStore((state) => state.deleteBook);
+  const getAllSadhna = useStore((state) => state.getAllSadhna);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -38,8 +40,15 @@ const AdminDashboard = () => {
   const [editActivityData, setEditActivityData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings', 'approvals'
+  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings', 'approvals', 'sadhna'
   const [pendingActivities, setPendingActivities] = useState([]);
+  const [allSadhna, setAllSadhna] = useState([]);
+  const [sadhnaLoading, setSadhnaLoading] = useState(false);
+  const [selectedSadhnaIds, setSelectedSadhnaIds] = useState([]);
+  const [sadhnaSearchQuery, setSadhnaSearchQuery] = useState('');
+  const [sadhnaDateFilter, setSadhnaDateFilter] = useState('');
+  const [sadhnaCurrentPage, setSadhnaCurrentPage] = useState(1);
+  const [sadhnaItemsPerPage, setSadhnaItemsPerPage] = useState(10);
   
   // Books management state
   const [showAddBookModal, setShowAddBookModal] = useState(false);
@@ -219,6 +228,107 @@ const AdminDashboard = () => {
       return () => clearInterval(interval);
     }
   }, [loadPendingActivities, activeSection]);
+
+  // Load all sadhna when sadhna section is active
+  const loadAllSadhna = async () => {
+    setSadhnaLoading(true);
+    try {
+      const sadhna = await getAllSadhna();
+      setAllSadhna(sadhna || []);
+    } catch (error) {
+      console.error('Error loading sadhna:', error);
+      toast.error('Failed to load sadhna: ' + error.message);
+    } finally {
+      setSadhnaLoading(false);
+    }
+  };
+
+  // Load sadhna data on component mount (to show count on tile)
+  useEffect(() => {
+    loadAllSadhna();
+  }, [getAllSadhna]);
+
+  // Reload sadhna when sadhna section becomes active
+  useEffect(() => {
+    if (activeSection === 'sadhna') {
+      loadAllSadhna();
+      setSelectedSadhnaIds([]); // Reset selection when section changes
+    }
+  }, [activeSection, getAllSadhna]);
+
+  // Export sadhna to Excel
+  const exportSadhnaToExcel = (sadhnaIds) => {
+    try {
+      // Filter selected sadhna entries
+      const selectedSadhna = allSadhna.filter(s => sadhnaIds.includes(s.id));
+      
+      if (selectedSadhna.length === 0) {
+        toast.error('No sadhna entries selected');
+        return;
+      }
+
+      // Prepare data for Excel
+      const excelData = selectedSadhna.map((sadhna) => {
+        return {
+          'Date': new Date(sadhna.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          'User Name': sadhna.userName,
+          'Email': sadhna.userEmail || '',
+          'Wake Up Time': sadhna.wakeUpTime || 'Not recorded',
+          'Mangla Arti': sadhna.manglaArti ? 'Yes' : 'No',
+          'Tulsi Arti': sadhna.tulsiArti ? 'Yes' : 'No',
+          'Guru Puja': sadhna.guruPuja ? 'Yes' : 'No',
+          'Sandhya Arti': sadhna.sandhyaArti ? 'Yes' : 'No',
+          'First Round Timing': sadhna.firstRoundTiming || 'Not recorded',
+          'Last Round Timing': sadhna.lastRoundTiming || 'Not recorded',
+          'Total Rounds': sadhna.totalRounds || 0,
+          'Lecture Hearing': sadhna.lectureHearing || 'Not done',
+          'Book Reading': sadhna.bookReading || 'Not done',
+          'Services Done': sadhna.servicesDone || 'No services recorded',
+        };
+      });
+
+      // Create workbook and worksheet
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sadhna Chart');
+
+      // Set column widths
+      const columnWidths = [
+        { wch: 20 }, // Date
+        { wch: 20 }, // User Name
+        { wch: 25 }, // Email
+        { wch: 15 }, // Wake Up Time
+        { wch: 12 }, // Mangla Arti
+        { wch: 12 }, // Tulsi Arti
+        { wch: 12 }, // Guru Puja
+        { wch: 12 }, // Sandhya Arti
+        { wch: 18 }, // First Round Timing
+        { wch: 18 }, // Last Round Timing
+        { wch: 12 }, // Total Rounds
+        { wch: 30 }, // Lecture Hearing
+        { wch: 30 }, // Book Reading
+        { wch: 30 }, // Services Done
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Generate filename with current date
+      const date = new Date();
+      const dateStr = date.toISOString().split('T')[0];
+      const count = selectedSadhna.length === allSadhna.length ? 'All' : selectedSadhna.length;
+      const filename = `Sadhna_Chart_${count}_${dateStr}.xlsx`;
+
+      // Write file and trigger download
+      XLSX.writeFile(workbook, filename);
+      
+      toast.success(`Exported ${selectedSadhna.length} sadhna entries to Excel`, {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error('Error exporting sadhna:', error);
+      toast.error('Failed to export sadhna: ' + error.message);
+    }
+  };
 
   // Handle add book
   const handleAddBook = async () => {
@@ -628,6 +738,38 @@ const AdminDashboard = () => {
           <h3 className="text-xl font-bold text-gray-800 mb-2">Manage Books</h3>
           <p className="text-sm text-gray-600 mb-4">
             Add, edit, or delete books and manage prices
+          </p>
+          <div className="flex items-center text-spiritual-600 font-medium text-sm">
+            <span>View Details</span>
+            <span className="ml-2">→</span>
+          </div>
+        </div>
+
+        {/* Sadhna Management Tile */}
+        <div
+          onClick={() => setActiveSection('sadhna')}
+          className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+            activeSection === 'sadhna' ? 'ring-2 ring-spiritual-500 ring-offset-2' : ''
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center text-3xl">
+              🕉️
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">
+                {(() => {
+                  // Count unique users who have submitted sadhna
+                  const uniqueUserIds = new Set(allSadhna.map(s => s.userId));
+                  return uniqueUserIds.size;
+                })()}
+              </p>
+              <p className="text-xs text-gray-500">Sadhna Devotees</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Sadhna Management</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            View all users' daily sadhna charts
           </p>
           <div className="flex items-center text-spiritual-600 font-medium text-sm">
             <span>View Details</span>
@@ -1666,6 +1808,358 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sadhna Management Section */}
+      {activeSection === 'sadhna' && (
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">🕉️ All Users Sadhna</h2>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={loadAllSadhna}
+              disabled={sadhnaLoading}
+              className="btn-secondary text-sm"
+            >
+              {sadhnaLoading ? 'Loading...' : '🔄 Refresh'}
+            </button>
+          </div>
+        </div>
+
+        {/* Search and Filter Section */}
+        {allSadhna.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="sm:col-span-2">
+              <input
+                type="text"
+                placeholder="🔍 Search by name or email..."
+                value={sadhnaSearchQuery}
+                onChange={(e) => {
+                  setSadhnaSearchQuery(e.target.value);
+                  setSadhnaCurrentPage(1); // Reset to first page on search
+                }}
+                className="input-field text-sm"
+              />
+            </div>
+            <div>
+              <input
+                type="date"
+                value={sadhnaDateFilter}
+                onChange={(e) => {
+                  setSadhnaDateFilter(e.target.value);
+                  setSadhnaCurrentPage(1); // Reset to first page on filter
+                }}
+                className="input-field text-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Filter and Pagination Info */}
+        {(() => {
+          // Filter sadhna entries
+          const filteredSadhna = allSadhna.filter((sadhna) => {
+            const matchesSearch = !sadhnaSearchQuery || 
+              (sadhna.userName && sadhna.userName.toLowerCase().includes(sadhnaSearchQuery.toLowerCase())) ||
+              (sadhna.userEmail && sadhna.userEmail.toLowerCase().includes(sadhnaSearchQuery.toLowerCase()));
+            const matchesDate = !sadhnaDateFilter || 
+              (sadhna.date && new Date(sadhna.date).toISOString().split('T')[0] === sadhnaDateFilter);
+            return matchesSearch && matchesDate;
+          });
+
+          // Pagination
+          const totalPages = Math.ceil(filteredSadhna.length / sadhnaItemsPerPage);
+          const startIndex = (sadhnaCurrentPage - 1) * sadhnaItemsPerPage;
+          const endIndex = startIndex + sadhnaItemsPerPage;
+          const paginatedSadhna = filteredSadhna.slice(startIndex, endIndex);
+
+          return (
+            <>
+              {/* Results Count and Items Per Page */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{startIndex + 1}</span> - <span className="font-semibold">{Math.min(endIndex, filteredSadhna.length)}</span> of <span className="font-semibold">{filteredSadhna.length}</span> entries
+                  {sadhnaSearchQuery && (
+                    <span className="ml-2 text-gray-500">
+                      (filtered from {allSadhna.length} total)
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">Items per page:</label>
+                  <select
+                    value={sadhnaItemsPerPage}
+                    onChange={(e) => {
+                      setSadhnaItemsPerPage(Number(e.target.value));
+                      setSadhnaCurrentPage(1);
+                    }}
+                    className="input-field text-sm w-20"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Export Buttons */}
+              {filteredSadhna.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    onClick={() => {
+                      if (selectedSadhnaIds.length === 0) {
+                        toast.info('Please select at least one entry to export');
+                        return;
+                      }
+                      exportSadhnaToExcel(selectedSadhnaIds);
+                    }}
+                    disabled={sadhnaLoading || selectedSadhnaIds.length === 0}
+                    className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    📥 Export Selected ({selectedSadhnaIds.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      const filteredIds = filteredSadhna.map(s => s.id);
+                      exportSadhnaToExcel(filteredIds);
+                    }}
+                    disabled={sadhnaLoading || filteredSadhna.length === 0}
+                    className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    📥 Export Filtered ({filteredSadhna.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      const allIds = allSadhna.map(s => s.id);
+                      exportSadhnaToExcel(allIds);
+                    }}
+                    disabled={sadhnaLoading || allSadhna.length === 0}
+                    className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    📥 Export All ({allSadhna.length})
+                  </button>
+                  {filteredSadhna.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (selectedSadhnaIds.length === filteredSadhna.length) {
+                          setSelectedSadhnaIds([]);
+                        } else {
+                          setSelectedSadhnaIds(filteredSadhna.map(s => s.id));
+                        }
+                      }}
+                      disabled={sadhnaLoading}
+                      className="btn-secondary text-sm whitespace-nowrap"
+                    >
+                      {selectedSadhnaIds.length === filteredSadhna.length ? '☐ Deselect All' : '☑ Select All'}
+                    </button>
+                  )}
+                </div>
+              )}
+        
+              {sadhnaLoading ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400">Loading sadhna data...</p>
+                </div>
+              ) : filteredSadhna.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400 text-lg">No sadhna entries found</p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    {sadhnaSearchQuery || sadhnaDateFilter 
+                      ? 'Try adjusting your search or filter criteria'
+                      : 'Users haven\'t submitted their sadhna yet'}
+                  </p>
+                  {(sadhnaSearchQuery || sadhnaDateFilter) && (
+                    <button
+                      onClick={() => {
+                        setSadhnaSearchQuery('');
+                        setSadhnaDateFilter('');
+                      }}
+                      className="btn-secondary text-sm mt-3"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    {paginatedSadhna.map((sadhna) => (
+              <div key={sadhna.id} className="border border-gray-200 rounded-xl p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedSadhnaIds.includes(sadhna.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSadhnaIds([...selectedSadhnaIds, sadhna.id]);
+                        } else {
+                          setSelectedSadhnaIds(selectedSadhnaIds.filter(id => id !== sadhna.id));
+                        }
+                      }}
+                      className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0 mt-1"
+                    />
+                    <img
+                      src={sadhna.userPhoto}
+                      alt={sadhna.userName}
+                      className="w-12 h-12 rounded-full border-2 border-gray-200 flex-shrink-0 object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-semibold text-gray-900 truncate">{sadhna.userName}</h3>
+                      <p className="text-xs text-gray-600 truncate">{sadhna.userEmail}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(sadhna.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                  {/* Wake Up Time */}
+                  <div className={`rounded-lg p-3 ${sadhna.wakeUpTime ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1">🌅 Wake Up Time</p>
+                    {sadhna.wakeUpTime ? (
+                      <p className="text-sm font-semibold text-green-700">{sadhna.wakeUpTime}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not recorded</p>
+                    )}
+                  </div>
+
+                  {/* Arti & Puja */}
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs text-gray-600 mb-2 font-medium">Arti & Puja</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Mangla Arti</span>
+                        {sadhna.manglaArti ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Tulsi Arti</span>
+                        {sadhna.tulsiArti ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Guru Puja</span>
+                        {sadhna.guruPuja ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Sandhya Arti</span>
+                        {sadhna.sandhyaArti ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Japa Rounds */}
+                  <div className={`rounded-lg p-3 ${(sadhna.firstRoundTiming || sadhna.lastRoundTiming || sadhna.totalRounds > 0) ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-2 font-medium">Japa Rounds</p>
+                    {sadhna.firstRoundTiming || sadhna.lastRoundTiming || sadhna.totalRounds > 0 ? (
+                      <div className="space-y-1">
+                        {sadhna.firstRoundTiming && <p className="text-xs text-gray-700">First: <span className="font-semibold text-green-700">{sadhna.firstRoundTiming}</span></p>}
+                        {sadhna.lastRoundTiming && <p className="text-xs text-gray-700">Last: <span className="font-semibold text-green-700">{sadhna.lastRoundTiming}</span></p>}
+                        {sadhna.totalRounds > 0 && <p className="text-xs font-semibold text-green-700">Total: {sadhna.totalRounds}</p>}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not recorded</p>
+                    )}
+                  </div>
+
+                  {/* Lecture Hearing */}
+                  <div className={`rounded-lg p-3 ${sadhna.lectureHearing ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1 font-medium">📚 Lecture Hearing</p>
+                    {sadhna.lectureHearing ? (
+                      <p className="text-sm text-gray-900 break-words">{sadhna.lectureHearing}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not done</p>
+                    )}
+                  </div>
+
+                  {/* Book Reading */}
+                  <div className={`rounded-lg p-3 ${sadhna.bookReading ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1 font-medium">📖 Book Reading</p>
+                    {sadhna.bookReading ? (
+                      <p className="text-sm text-gray-900 break-words">{sadhna.bookReading}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not done</p>
+                    )}
+                  </div>
+
+                  {/* Services Done */}
+                  <div className={`rounded-lg p-3 sm:col-span-2 lg:col-span-3 ${sadhna.servicesDone ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1 font-medium">🛎️ Services Done</p>
+                    {sadhna.servicesDone ? (
+                      <p className="text-sm text-gray-900 break-words">{sadhna.servicesDone}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No services recorded</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-200">
+                      <div className="text-sm text-gray-600">
+                        Page <span className="font-semibold">{sadhnaCurrentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSadhnaCurrentPage(1)}
+                          disabled={sadhnaCurrentPage === 1}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          « First
+                        </button>
+                        <button
+                          onClick={() => setSadhnaCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={sadhnaCurrentPage === 1}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          ‹ Prev
+                        </button>
+                        <span className="text-sm text-gray-600 px-3">
+                          {sadhnaCurrentPage} / {totalPages}
+                        </span>
+                        <button
+                          onClick={() => setSadhnaCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={sadhnaCurrentPage === totalPages}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next ›
+                        </button>
+                        <button
+                          onClick={() => setSadhnaCurrentPage(totalPages)}
+                          disabled={sadhnaCurrentPage === totalPages}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Last »
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          );
+        })()}
+      </div>
       )}
 
       {/* Delete Book Confirmation Modal */}

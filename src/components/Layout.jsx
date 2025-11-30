@@ -294,9 +294,13 @@ const Layout = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14">
             <div className="flex items-center space-x-3 flex-1">
-              <Link to="/" className="flex items-center space-x-2">
-                <span className="text-xl">🕉️</span>
-                <h1 className="text-lg font-semibold text-gray-900">
+              <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                <img 
+                  src="/prabhupada-loading.png" 
+                  alt="Srila Prabhupada" 
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border-2 border-purple-200"
+                />
+                <h1 className="text-base sm:text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                   Gita Tracker
                 </h1>
               </Link>
@@ -542,6 +546,14 @@ const Layout = ({ children }) => {
                         >
                           <span className="mr-3">📝</span>
                           Submit Daily Distribution
+                        </Link>
+                        <Link
+                          to="/sadhna"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-900 hover:bg-gray-100 active:bg-gray-200 transition-all duration-150 rounded-lg mx-2 font-medium"
+                        >
+                          <span className="mr-3">🕉️</span>
+                          Daily Sadhna Chart
                         </Link>
                         {currentUserProfile && (
                           <Link

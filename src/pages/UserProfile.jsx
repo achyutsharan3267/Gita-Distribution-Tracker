@@ -4,6 +4,26 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatMobileNumber } from '../utils/maskMobileNumber';
 import { useEffect, useState } from 'react';
 import { getBookValue, getActivityBookValue, mapBookIdToUserProperty } from '../utils/bookMapping';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const UserProfile = () => {
   const { userId } = useParams();
@@ -14,6 +34,7 @@ const UserProfile = () => {
   const books = useStore((state) => state.books);
   const loadBooks = useStore((state) => state.loadBooks);
   const loadUserActivities = useStore((state) => state.loadUserActivities);
+  const getUserSadhna = useStore((state) => state.getUserSadhna);
   const user = users.find((u) => u.id === userId);
   
   // Check if viewing own profile
@@ -21,6 +42,10 @@ const UserProfile = () => {
   
   // Accordion state for rejected activities
   const [isRejectedExpanded, setIsRejectedExpanded] = useState(false);
+  
+  // Sadhna graph data
+  const [userSadhna, setUserSadhna] = useState([]);
+  const [sadhnaLoading, setSadhnaLoading] = useState(true);
 
   // Load books on mount
   useEffect(() => {
@@ -46,6 +71,35 @@ const UserProfile = () => {
       });
     }
   }, [user?.id, loadUserActivities, isAdmin, isOwnProfile]);
+
+  // Load user's sadhna data for graph
+  useEffect(() => {
+    const loadSadhna = async () => {
+      if (!user?.id) {
+        setSadhnaLoading(false);
+        return;
+      }
+
+      try {
+        setSadhnaLoading(true);
+        const sadhna = await getUserSadhna(user.id);
+        // Sort by date (newest first) and limit to last 30 days
+        const sortedSadhna = sadhna
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .slice(0, 30);
+        
+        setUserSadhna(sortedSadhna);
+        console.log('Loaded sadhna data:', sortedSadhna);
+      } catch (error) {
+        console.error('Error loading user sadhna:', error);
+        setUserSadhna([]);
+      } finally {
+        setSadhnaLoading(false);
+      }
+    };
+
+    loadSadhna();
+  }, [user?.id, getUserSadhna]);
   
   const handleSubmitDistribution = () => {
     console.log('Submit Distribution button clicked');
@@ -283,6 +337,216 @@ const UserProfile = () => {
           );
         })}
       </div>
+
+      {/* Sadhna Rounds Graph */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <span className="mr-2">📿</span>
+            Japa Rounds History (Last 30 Days)
+          </h2>
+        </div>
+        
+        {sadhnaLoading ? (
+          <div className="text-center py-8">
+            <p className="text-gray-400">Loading sadhna data...</p>
+          </div>
+        ) : userSadhna.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-400 text-lg mb-2">No sadhna data found</p>
+            <p className="text-gray-500 text-sm">
+              Start submitting your daily sadhna to see your rounds history here.
+            </p>
+            {isOwnProfile && (
+              <Link
+                to="/sadhna"
+                className="inline-block mt-4 btn-primary text-sm"
+              >
+                Submit Sadhna
+              </Link>
+            )}
+          </div>
+        ) : (() => {
+          // Prepare data for Chart.js
+          const sortedData = [...userSadhna].sort((a, b) => new Date(a.date) - new Date(b.date));
+          const labels = sortedData.map(sadhna => {
+            const date = new Date(sadhna.date);
+            return `${date.getDate()}/${date.getMonth() + 1}`;
+          });
+          const roundsData = sortedData.map(sadhna => sadhna.totalRounds || 0);
+          
+          // Color based on rounds
+          const backgroundColors = sortedData.map(sadhna => {
+            const rounds = sadhna.totalRounds || 0;
+            if (rounds >= 16) {
+              return 'rgba(16, 185, 129, 0.8)'; // emerald-500
+            } else if (rounds >= 12) {
+              return 'rgba(34, 197, 94, 0.8)'; // green-500
+            } else if (rounds >= 8) {
+              return 'rgba(234, 179, 8, 0.8)'; // yellow-500
+            } else if (rounds > 0) {
+              return 'rgba(249, 115, 22, 0.8)'; // orange-500
+            } else {
+              return 'rgba(209, 213, 219, 0.8)'; // gray-300
+            }
+          });
+
+          const borderColors = sortedData.map(sadhna => {
+            const rounds = sadhna.totalRounds || 0;
+            if (rounds >= 16) {
+              return 'rgba(16, 185, 129, 1)'; // emerald-500
+            } else if (rounds >= 12) {
+              return 'rgba(34, 197, 94, 1)'; // green-500
+            } else if (rounds >= 8) {
+              return 'rgba(234, 179, 8, 1)'; // yellow-500
+            } else if (rounds > 0) {
+              return 'rgba(249, 115, 22, 1)'; // orange-500
+            } else {
+              return 'rgba(209, 213, 219, 1)'; // gray-300
+            }
+          });
+
+          const chartData = {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Japa Rounds',
+                data: roundsData,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false,
+              },
+            ],
+          };
+
+          const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false,
+              },
+              tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: {
+                  size: 14,
+                  weight: 'bold',
+                },
+                bodyFont: {
+                  size: 13,
+                },
+                callbacks: {
+                  title: function(context) {
+                    const index = context[0].dataIndex;
+                    const sadhna = sortedData[index];
+                    const date = new Date(sadhna.date);
+                    return date.toLocaleDateString('en-US', { 
+                      weekday: 'short', 
+                      year: 'numeric', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    });
+                  },
+                  label: function(context) {
+                    return `Rounds: ${context.parsed.y}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: Math.max(...roundsData, 16),
+                ticks: {
+                  stepSize: 2,
+                  font: {
+                    size: 11,
+                  },
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)',
+                },
+              },
+              x: {
+                ticks: {
+                  font: {
+                    size: 11,
+                  },
+                  maxRotation: 45,
+                  minRotation: 45,
+                },
+                grid: {
+                  display: false,
+                },
+              },
+            },
+          };
+
+          return (
+            <div className="space-y-4">
+              {/* Chart.js Graph */}
+              <div className="relative" style={{ height: '300px' }}>
+                <Bar data={chartData} options={chartOptions} />
+              </div>
+              
+              {/* Legend */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgba(16, 185, 129, 0.8)' }}></div>
+                  <span className="text-gray-600">16+ rounds</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgba(34, 197, 94, 0.8)' }}></div>
+                  <span className="text-gray-600">12-15 rounds</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgba(234, 179, 8, 0.8)' }}></div>
+                  <span className="text-gray-600">8-11 rounds</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgba(249, 115, 22, 0.8)' }}></div>
+                  <span className="text-gray-600">1-7 rounds</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgba(209, 213, 219, 0.8)' }}></div>
+                  <span className="text-gray-600">No rounds</span>
+                </div>
+              </div>
+              
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-gray-200">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">Total Days</p>
+                  <p className="text-lg font-bold text-gray-900">{userSadhna.length}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">Avg Rounds</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {userSadhna.length > 0 
+                      ? Math.round(userSadhna.reduce((sum, s) => sum + (s.totalRounds || 0), 0) / userSadhna.length)
+                      : 0}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">Max Rounds</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {Math.max(...userSadhna.map(s => s.totalRounds || 0), 0)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">Target Days</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {userSadhna.filter(s => (s.totalRounds || 0) >= 16).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+        </div>
 
       {/* Activity History */}
       <div className="card p-5">

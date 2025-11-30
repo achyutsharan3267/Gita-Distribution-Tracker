@@ -15,6 +15,7 @@ import EditProfile from './pages/EditProfile';
 import AdminDashboard from './pages/AdminDashboard';
 import BookBreakdown from './pages/BookBreakdown';
 import BooksAndPrices from './pages/BooksAndPrices';
+import SadhnaForm from './pages/SadhnaForm';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
@@ -173,6 +174,7 @@ function AppContent() {
           {/* Protected routes - login required */}
           <Route path="/form" element={<ProtectedRoute><DistributionForm /></ProtectedRoute>} />
           <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+          <Route path="/sadhna" element={<ProtectedRoute><SadhnaForm /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         </Routes>
       </Layout>

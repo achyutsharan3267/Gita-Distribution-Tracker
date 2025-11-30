@@ -49,10 +49,14 @@ const Dashboard = () => {
   const loadBooks = useStore((state) => state.loadBooks);
   const initialize = useStore((state) => state.initialize);
   const currentUserProfile = useStore((state) => state.currentUserProfile);
+  const getSadhnaForDate = useStore((state) => state.getSadhnaForDate);
   const { user: authUser } = useAuth();
   const navigate = useNavigate();
 
   const [currentQuote, setCurrentQuote] = useState(quotes[0]);
+  const [isSadhnaPending, setIsSadhnaPending] = useState(false);
+  const [checkingSadhna, setCheckingSadhna] = useState(true);
+  const [todaySadhna, setTodaySadhna] = useState(null);
 
   // Rotate quotes every 10 seconds
   useEffect(() => {
@@ -68,6 +72,31 @@ const Dashboard = () => {
   useEffect(() => {
     loadBooks();
   }, [loadBooks]);
+
+  // Check if today's sadhna is pending
+  useEffect(() => {
+    const checkTodaySadhna = async () => {
+      if (!currentUserProfile) {
+        setCheckingSadhna(false);
+        return;
+      }
+
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const sadhna = await getSadhnaForDate(currentUserProfile.id, today);
+        setTodaySadhna(sadhna);
+        setIsSadhnaPending(!sadhna);
+      } catch (error) {
+        console.error('Error checking sadhna:', error);
+        setIsSadhnaPending(false);
+        setTodaySadhna(null);
+      } finally {
+        setCheckingSadhna(false);
+      }
+    };
+
+    checkTodaySadhna();
+  }, [currentUserProfile, getSadhnaForDate]);
 
   // Filter out users with 0 total books
   const activeLeaderboard = leaderboard.filter((user) => user.totalDistributed > 0);
@@ -108,6 +137,148 @@ const Dashboard = () => {
           🔄 Refresh
         </button>
       </div>
+
+      {/* Today's Sadhna Status */}
+      {!checkingSadhna && currentUserProfile && (
+        <>
+          {/* Pending Notification */}
+          {isSadhnaPending && (
+            <div className="card p-4 sm:p-5 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300">
+              <div className="flex items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="text-3xl">⏳</div>
+                  <div className="flex-1">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
+                      Today's Sadhna Pending
+                    </h3>
+                    <p className="text-sm text-gray-700 mb-3">
+                      You haven't submitted your daily sadhna for today. Please fill it out to track your spiritual practices.
+                    </p>
+                    <Link
+                      to="/sadhna"
+                      className="inline-flex items-center gap-2 btn-primary text-sm px-4 py-2"
+                    >
+                      <span>🕉️</span>
+                      <span>Submit Today's Sadhna</span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Completed Sadhna - Rounds Count */}
+          {!isSadhnaPending && todaySadhna && todaySadhna.totalRounds > 0 && (() => {
+            const targetRounds = 16;
+            const completedRounds = todaySadhna.totalRounds;
+            const percentage = Math.min((completedRounds / targetRounds) * 100, 100);
+            const isExceeded = completedRounds > targetRounds;
+            
+            // Color based on percentage
+            let bgGradient = '';
+            let borderColor = '';
+            let textColor = '';
+            let progressColor = '';
+            
+            if (percentage < 25) {
+              bgGradient = 'from-red-50 to-orange-50';
+              borderColor = 'border-red-300';
+              textColor = 'text-red-700';
+              progressColor = 'bg-red-500';
+            } else if (percentage < 50) {
+              bgGradient = 'from-orange-50 to-yellow-50';
+              borderColor = 'border-orange-300';
+              textColor = 'text-orange-700';
+              progressColor = 'bg-orange-500';
+            } else if (percentage < 75) {
+              bgGradient = 'from-yellow-50 to-green-50';
+              borderColor = 'border-yellow-300';
+              textColor = 'text-yellow-700';
+              progressColor = 'bg-yellow-500';
+            } else if (percentage < 100) {
+              bgGradient = 'from-green-50 to-emerald-50';
+              borderColor = 'border-green-300';
+              textColor = 'text-green-700';
+              progressColor = 'bg-green-500';
+            } else {
+              bgGradient = 'from-emerald-50 to-teal-50';
+              borderColor = 'border-emerald-400';
+              textColor = 'text-emerald-700';
+              progressColor = 'bg-emerald-500';
+            }
+            
+            return (
+              <div className={`card p-4 sm:p-5 bg-gradient-to-r ${bgGradient} border-2 ${borderColor} relative overflow-hidden`}>
+                {isExceeded && (
+                  <div className="absolute top-2 right-2">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-lg animate-pulse">
+                      <span>⭐</span>
+                      <span>Exceeded Target!</span>
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="text-3xl">📿</div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
+                        Today's Japa Rounds
+                      </h3>
+                      <p className="text-sm text-gray-700">
+                        {isExceeded 
+                          ? `Amazing! You've exceeded the daily target of ${targetRounds} rounds! 🙏`
+                          : `You've completed your sadhna for today`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-3xl sm:text-4xl font-bold ${textColor}`}>
+                      {completedRounds}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      / {targetRounds} Rounds
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {Math.round(percentage)}% Complete
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="mb-3">
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className={`h-full ${progressColor} transition-all duration-500 ease-out rounded-full flex items-center justify-end pr-1`}
+                      style={{ width: `${Math.min(percentage, 100)}%` }}
+                    >
+                      {percentage >= 50 && (
+                        <span className="text-white text-xs font-bold">✓</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {(todaySadhna.firstRoundTiming || todaySadhna.lastRoundTiming) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-4 text-sm">
+                    {todaySadhna.firstRoundTiming && (
+                      <div>
+                        <span className="text-gray-600">First Round:</span>
+                        <span className="font-semibold text-gray-900 ml-2">{todaySadhna.firstRoundTiming}</span>
+                      </div>
+                    )}
+                    {todaySadhna.lastRoundTiming && (
+                      <div>
+                        <span className="text-gray-600">Last Round:</span>
+                        <span className="font-semibold text-gray-900 ml-2">{todaySadhna.lastRoundTiming}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </>
+      )}
 
       {/* User's Personal Stats - Only if logged in */}
       {currentUserProfile && (() => {
