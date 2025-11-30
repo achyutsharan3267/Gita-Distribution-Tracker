@@ -98,23 +98,95 @@ const SadhnaForm = () => {
     );
   }
 
+  // Helper function to convert time string to minutes for comparison
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return null;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: '' }));
-    }
+    
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value,
+      };
+      
+      // Validate times when they change
+      const newErrors = { ...errors };
+      
+      // Clear error for the field being changed
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
+      // Validate first round timing
+      if (name === 'firstRoundTiming' || name === 'wakeUpTime' || name === 'lastRoundTiming') {
+        const wakeUpMinutes = timeToMinutes(updated.wakeUpTime);
+        const firstRoundMinutes = timeToMinutes(updated.firstRoundTiming);
+        const lastRoundMinutes = timeToMinutes(updated.lastRoundTiming);
+        
+        // First round should not be before wake up time
+        if (updated.firstRoundTiming && updated.wakeUpTime) {
+          if (firstRoundMinutes < wakeUpMinutes) {
+            newErrors.firstRoundTiming = 'First round time cannot be before wake up time';
+          }
+        }
+        
+        // First round should not be after last round time
+        if (updated.firstRoundTiming && updated.lastRoundTiming) {
+          if (firstRoundMinutes > lastRoundMinutes) {
+            newErrors.firstRoundTiming = 'First round time cannot be after last round time';
+          }
+        }
+        
+        // Last round should not be before first round time
+        if (updated.lastRoundTiming && updated.firstRoundTiming) {
+          if (lastRoundMinutes < firstRoundMinutes) {
+            newErrors.lastRoundTiming = 'Last round time cannot be before first round time';
+          }
+        }
+      }
+      
+      setErrors(newErrors);
+      return updated;
+    });
   };
 
   const validate = () => {
     const newErrors = {};
     
+    // Validate total rounds
     if (formData.totalRounds && (isNaN(formData.totalRounds) || parseInt(formData.totalRounds) < 0)) {
       newErrors.totalRounds = 'Total rounds must be a valid number';
+    }
+    
+    // Validate time relationships
+    const wakeUpMinutes = timeToMinutes(formData.wakeUpTime);
+    const firstRoundMinutes = timeToMinutes(formData.firstRoundTiming);
+    const lastRoundMinutes = timeToMinutes(formData.lastRoundTiming);
+    
+    // First round should not be before wake up time
+    if (formData.firstRoundTiming && formData.wakeUpTime) {
+      if (firstRoundMinutes < wakeUpMinutes) {
+        newErrors.firstRoundTiming = 'First round time cannot be before wake up time';
+      }
+    }
+    
+    // First round should not be after last round time
+    if (formData.firstRoundTiming && formData.lastRoundTiming) {
+      if (firstRoundMinutes > lastRoundMinutes) {
+        newErrors.firstRoundTiming = 'First round time cannot be after last round time';
+      }
+    }
+    
+    // Last round should not be before first round time
+    if (formData.lastRoundTiming && formData.firstRoundTiming) {
+      if (lastRoundMinutes < firstRoundMinutes) {
+        newErrors.lastRoundTiming = 'Last round time cannot be before first round time';
+      }
     }
 
     setErrors(newErrors);
@@ -290,8 +362,11 @@ const SadhnaForm = () => {
                 name="firstRoundTiming"
                 value={formData.firstRoundTiming}
                 onChange={handleChange}
-                className="input-field"
+                className={`input-field ${errors.firstRoundTiming ? 'border-red-500 focus:ring-red-500' : ''}`}
               />
+              {errors.firstRoundTiming && (
+                <p className="text-xs text-red-600 mt-1">{errors.firstRoundTiming}</p>
+              )}
             </div>
 
             <div>
@@ -303,8 +378,11 @@ const SadhnaForm = () => {
                 name="lastRoundTiming"
                 value={formData.lastRoundTiming}
                 onChange={handleChange}
-                className="input-field"
+                className={`input-field ${errors.lastRoundTiming ? 'border-red-500 focus:ring-red-500' : ''}`}
               />
+              {errors.lastRoundTiming && (
+                <p className="text-xs text-red-600 mt-1">{errors.lastRoundTiming}</p>
+              )}
             </div>
 
             <div>

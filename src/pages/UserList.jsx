@@ -135,7 +135,7 @@ const UserList = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, mobile, or email..."
-                className="input-field pl-9 sm:pl-10 w-full text-sm sm:text-base"
+                className="tour-search input-field pl-9 sm:pl-10 w-full text-sm sm:text-base"
               />
               <svg
                 className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400"
@@ -149,7 +149,7 @@ const UserList = () => {
           </div>
           <div className="flex gap-2 sm:gap-3 items-center">
             {/* View Toggle Buttons */}
-            <div className="flex border border-gray-200 rounded-2xl overflow-hidden bg-gray-50">
+            <div className="tour-view-toggle flex border border-gray-200 rounded-2xl overflow-hidden bg-gray-50">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`px-4 py-2 text-sm transition-all flex items-center gap-2 ${
@@ -227,7 +227,7 @@ const UserList = () => {
           </button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="tour-user-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredLeaderboard.map((user) => {
             const totalDistributed = books.reduce((sum, book) => {
               const bookId = book.id || book.bookId;
@@ -300,7 +300,7 @@ const UserList = () => {
           })}
         </div>
       ) : (
-        <div className="card p-5">
+        <div className="tour-user-list card p-5">
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 rounded-xl">
             <div className="inline-block min-w-full align-middle">
               <table className="min-w-[950px] sm:min-w-full">

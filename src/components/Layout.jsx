@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import introJs from 'intro.js';
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -83,6 +84,17 @@ const Layout = ({ children }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showUserMenu, showNotifications]);
+
+  // Auto-start tour on first visit (optional - can be enabled)
+  // useEffect(() => {
+  //   if (user && !localStorage.getItem('tourCompleted')) {
+  //     // Small delay to ensure DOM is ready
+  //     const timer = setTimeout(() => {
+  //       startTour();
+  //     }, 1000);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [user]);
 
   // Load pending activities count and notifications for admin
   useEffect(() => {
@@ -287,6 +299,388 @@ const Layout = ({ children }) => {
     navigate('/');
   };
 
+  const startTour = () => {
+    console.log('Tour button clicked');
+    // Small delay to ensure DOM is ready
+    setTimeout(() => {
+      const tourSteps = [];
+      
+      // Helper function to check if element exists
+      const elementExists = (selector) => {
+        const element = document.querySelector(selector);
+        const exists = element !== null;
+        if (!exists) {
+          console.log(`Element not found: ${selector}`);
+        }
+        return exists;
+      };
+      
+      // Get current page and add appropriate steps
+      const currentPath = location.pathname;
+      console.log('Current path:', currentPath);
+      
+      if (currentPath === '/') {
+        // Dashboard tour - Comprehensive
+        if (elementExists('.tour-logo')) {
+          tourSteps.push({
+            element: '.tour-logo',
+            intro: '🕉️ Welcome to Gita Tracker! Your dashboard for tracking book distribution and spiritual progress.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-sadhna-status')) {
+          tourSteps.push({
+            element: '.tour-sadhna-status',
+            intro: '📿 Daily Sadhna Status: Check if you\'ve submitted today\'s sadhna. Click to submit or view your rounds.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-your-contribution')) {
+          tourSteps.push({
+            element: '.tour-your-contribution',
+            intro: '📊 Your Contribution: See your total books distributed, money collected, rank, and financial summary (Amount as per Books, Donation/Insufficient Funds).',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-quotes')) {
+          tourSteps.push({
+            element: '.tour-quotes',
+            intro: '💬 Inspirational Quotes: Read Srila Prabhupada\'s teachings about book distribution. Quotes rotate automatically.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-top-3')) {
+          tourSteps.push({
+            element: '.tour-top-3',
+            intro: '🏆 Top 3 Distributors: See the leading devotees in book distribution with their photos and stats.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-leaderboard')) {
+          tourSteps.push({
+            element: '.tour-leaderboard',
+            intro: '📈 Top 10 Leaderboard: Complete ranking of all devotees. Click on any devotee to view their profile.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-active-books')) {
+          tourSteps.push({
+            element: '.tour-active-books',
+            intro: '📚 Active Books: Click here to see all available books, their prices, and descriptions.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-notifications')) {
+          tourSteps.push({
+            element: '.tour-notifications',
+            intro: '🔔 Notifications: Get notified when your submissions are approved or when new activities need your attention.',
+            position: 'left'
+          });
+        }
+        if (elementExists('.tour-profile-menu')) {
+          tourSteps.push({
+            element: '.tour-profile-menu',
+            intro: '👤 Profile Menu: Access your profile, submit daily distribution, view/edit sadhna, and manage your account.',
+            position: 'left'
+          });
+        }
+      } else if (currentPath === '/users') {
+        // User List tour
+        if (elementExists('.tour-logo')) {
+          tourSteps.push({
+            element: '.tour-logo',
+            intro: '👥 All Devotees: Browse all devotees and their distribution statistics.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-search')) {
+          tourSteps.push({
+            element: '.tour-search',
+            intro: '🔍 Search: Find devotees by name, email, or mobile number. Type to filter results instantly.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-view-toggle')) {
+          tourSteps.push({
+            element: '.tour-view-toggle',
+            intro: '👁️ View Toggle: Switch between Grid View (cards) and List View (table) to see devotees in different formats.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-user-list')) {
+          tourSteps.push({
+            element: '.tour-user-list',
+            intro: '📋 Devotees List: Click on any devotee card to view their detailed profile and activity history.',
+            position: 'top'
+          });
+        }
+      } else if (currentPath.startsWith('/user/')) {
+        // User Profile tour
+        if (elementExists('.tour-profile-header')) {
+          tourSteps.push({
+            element: '.tour-profile-header',
+            intro: '👤 Profile Header: View devotee\'s photo, name, location, and contact information.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-profile-stats')) {
+          tourSteps.push({
+            element: '.tour-profile-stats',
+            intro: '📊 Statistics: See total books distributed, money collected, and financial breakdown (Amount as per Books, Donation/Insufficient Funds).',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-sadhna-graph')) {
+          tourSteps.push({
+            element: '.tour-sadhna-graph',
+            intro: '📈 Sadhna Graph: Visual representation of daily japa rounds for the last 30 days. Track your spiritual progress.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-activity-history')) {
+          tourSteps.push({
+            element: '.tour-activity-history',
+            intro: '📅 Activity History: View all distribution submissions grouped by date. See approved, pending, and rejected activities.',
+            position: 'top'
+          });
+        }
+      } else if (currentPath === '/form') {
+        // Distribution Form tour
+        if (elementExists('.tour-form-header')) {
+          tourSteps.push({
+            element: '.tour-form-header',
+            intro: '📝 Daily Distribution Form: Submit your daily book distribution and money collection.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-current-totals')) {
+          tourSteps.push({
+            element: '.tour-current-totals',
+            intro: '📊 Current Totals: See your existing distribution counts before submitting new entries.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-book-inputs')) {
+          tourSteps.push({
+            element: '.tour-book-inputs',
+            intro: '📚 Book Distribution: Enter the number of books distributed for each active book type.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-money-section')) {
+          tourSteps.push({
+            element: '.tour-money-section',
+            intro: '💰 Money Details: Enter online and offline amounts. The system calculates total received, amount as per books, and donation/insufficient funds.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-submit-button')) {
+          tourSteps.push({
+            element: '.tour-submit-button',
+            intro: '✅ Submit: After submission, your activity will be sent to admin for approval. You\'ll be notified once approved.',
+            position: 'top'
+          });
+        }
+      } else if (currentPath === '/books-prices') {
+        // Books & Prices tour
+        if (elementExists('.tour-books-header')) {
+          tourSteps.push({
+            element: '.tour-books-header',
+            intro: '📚 Active Books: View all available books for distribution with their details.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-books-list')) {
+          tourSteps.push({
+            element: '.tour-books-list',
+            intro: '📖 Book Cards: Each card shows book name, ID, price, and description. Click to see more details.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-price-summary')) {
+          tourSteps.push({
+            element: '.tour-price-summary',
+            intro: '💰 Price Summary: Quick overview of all book prices and total value calculation.',
+            position: 'top'
+          });
+        }
+      } else if (currentPath === '/books') {
+        // Book Breakdown tour
+        if (elementExists('.tour-breakdown-header')) {
+          tourSteps.push({
+            element: '.tour-breakdown-header',
+            intro: '📊 Book Distribution Breakdown: See detailed statistics for each book type.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-breakdown-stats')) {
+          tourSteps.push({
+            element: '.tour-breakdown-stats',
+            intro: '📈 Statistics: View total distribution count, percentage, and progress bars for each book type.',
+            position: 'top'
+          });
+        }
+      } else if (currentPath === '/sadhna') {
+        // Sadhna Form tour
+        if (elementExists('.tour-sadhna-header')) {
+          tourSteps.push({
+            element: '.tour-sadhna-header',
+            intro: '🕉️ Daily Sadhna Chart: Track your daily spiritual practices including arti attendance, japa rounds, and study.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-sadhna-arti')) {
+          tourSteps.push({
+            element: '.tour-sadhna-arti',
+            intro: '🔔 Arti & Puja: Mark which artis and pujas you attended today (Mangla, Tulsi, Guru Puja, Sandhya).',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-sadhna-rounds')) {
+          tourSteps.push({
+            element: '.tour-sadhna-rounds',
+            intro: '📿 Japa Rounds: Enter your first and last round timings, and total rounds completed today.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-sadhna-study')) {
+          tourSteps.push({
+            element: '.tour-sadhna-study',
+            intro: '📚 Study & Service: Record lecture hearing, book reading, and any services performed. Check "Yes" to add details.',
+            position: 'top'
+          });
+        }
+      } else if (currentPath === '/edit-profile') {
+        // Edit Profile tour
+        if (elementExists('.tour-edit-header')) {
+          tourSteps.push({
+            element: '.tour-edit-header',
+            intro: '✏️ Edit Profile: Update your personal information, photo, location, and contact details.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-edit-photo')) {
+          tourSteps.push({
+            element: '.tour-edit-photo',
+            intro: '📷 Profile Photo: Upload or change your profile picture. Maximum file size is 150 KB.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-edit-details')) {
+          tourSteps.push({
+            element: '.tour-edit-details',
+            intro: '📝 Personal Details: Update your name, email, mobile number, city, and base location.',
+            position: 'top'
+          });
+        }
+      } else if (currentPath === '/admin') {
+        // Admin Dashboard tour - Comprehensive
+        if (elementExists('.tour-logo')) {
+          tourSteps.push({
+            element: '.tour-logo',
+            intro: '⚙️ Admin Dashboard: Manage users, books, approvals, and system settings.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-admin-tiles')) {
+          tourSteps.push({
+            element: '.tour-admin-tiles',
+            intro: '🎯 Admin Tiles: Access different sections - Manage Users, Manage Books, Pending Approvals, and Sadhna Management.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-admin-users')) {
+          tourSteps.push({
+            element: '.tour-admin-users',
+            intro: '👥 User Management: View all users, edit profiles, reset passwords, and manage user data.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-admin-pending')) {
+          tourSteps.push({
+            element: '.tour-admin-pending',
+            intro: '⏳ Pending Approvals: Review and approve/reject user submissions. Activities are pending until approved.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-admin-books')) {
+          tourSteps.push({
+            element: '.tour-admin-books',
+            intro: '📚 Book Management: Add new books, edit existing books, or delete books from the system.',
+            position: 'top'
+          });
+        }
+        if (elementExists('.tour-admin-sadhna')) {
+          tourSteps.push({
+            element: '.tour-admin-sadhna',
+            intro: '🕉️ Sadhna Management: View all users\' sadhna entries, search, filter by date, and export to Excel.',
+            position: 'top'
+          });
+        }
+      } else {
+        // Generic tour
+        if (elementExists('.tour-logo')) {
+          tourSteps.push({
+            element: '.tour-logo',
+            intro: '🕉️ Welcome to Gita Tracker! Use the navigation to explore different features.',
+            position: 'bottom'
+          });
+        }
+        if (elementExists('.tour-profile-menu')) {
+          tourSteps.push({
+            element: '.tour-profile-menu',
+            intro: '👤 Profile Menu: Access your profile, submit distribution, and view your sadhna from here.',
+            position: 'left'
+          });
+        }
+      }
+
+      console.log('Tour steps:', tourSteps);
+      
+      if (tourSteps.length > 0) {
+        try {
+          console.log('Starting intro.js tour...');
+          console.log('introJs available:', typeof introJs);
+          
+          // Check if introJs is available
+          if (!introJs || typeof introJs !== 'function') {
+            console.error('introJs is not available');
+            toast.error('Tour feature is not available. Please refresh the page.');
+            return;
+          }
+          
+          const intro = introJs();
+          console.log('intro instance created:', intro);
+          
+          intro.setOptions({
+            steps: tourSteps,
+            showProgress: true,
+            showBullets: true,
+            exitOnOverlayClick: true,
+            exitOnEsc: true,
+            nextLabel: 'Next →',
+            prevLabel: '← Previous',
+            skipLabel: 'Skip Tour',
+            doneLabel: 'Done ✓',
+            tooltipClass: 'customTooltip',
+            highlightClass: 'customHighlight',
+          });
+          
+          console.log('Options set, starting tour...');
+          intro.start();
+          console.log('Tour started successfully');
+        } catch (error) {
+          console.error('Error starting tour:', error);
+          console.error('Error details:', error.message, error.stack);
+          toast.error('Unable to start tour. Please check console for details.');
+        }
+      } else {
+        console.log('No tour steps found');
+        toast.info('No tour steps available for this page.');
+      }
+    }, 100);
+  };
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -294,7 +688,7 @@ const Layout = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14">
             <div className="flex items-center space-x-3 flex-1">
-              <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+              <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity tour-logo">
                 <img 
                   src="/prabhupada-loading.png" 
                   alt="Srila Prabhupada" 
@@ -306,6 +700,28 @@ const Layout = ({ children }) => {
               </Link>
             </div>
             <div className="flex items-center space-x-3 flex-shrink-0">
+              {/* Help/Tour Button */}
+              {user && (
+                <button
+                  onClick={startTour}
+                  className="p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="Take a tour of the app"
+                >
+                  <svg
+                    className="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </button>
+              )}
               {user ? (
                 <>
                   {/* Notification Bell Icon */}
@@ -487,7 +903,7 @@ const Layout = ({ children }) => {
                   <div className="relative" ref={menuRef}>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="tour-profile-menu flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <img
                       src={currentUserProfile?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email || 'User')}&background=22c55e&color=fff&size=128`}

@@ -143,7 +143,7 @@ const Dashboard = () => {
         <>
           {/* Pending Notification */}
           {isSadhnaPending && (
-            <div className="card p-4 sm:p-5 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300">
+            <div className="tour-sadhna-status card p-4 sm:p-5 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300">
               <div className="flex items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-3 flex-1">
                   <div className="text-3xl">⏳</div>
@@ -208,7 +208,7 @@ const Dashboard = () => {
             }
             
             return (
-              <div className={`card p-4 sm:p-5 bg-gradient-to-r ${bgGradient} border-2 ${borderColor} relative overflow-hidden`}>
+              <div className={`tour-sadhna-status card p-4 sm:p-5 bg-gradient-to-r ${bgGradient} border-2 ${borderColor} relative overflow-hidden`}>
                 {isExceeded && (
                   <div className="absolute top-2 right-2">
                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-lg animate-pulse">
@@ -302,7 +302,7 @@ const Dashboard = () => {
           : 0;
 
         return (
-          <div className="card p-4 sm:p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
+          <div className="tour-your-contribution card p-4 sm:p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900">Your Contribution</h2>
               <span className="text-2xl">🙏</span>
@@ -417,7 +417,7 @@ const Dashboard = () => {
         {/* Active Books Card - Clickable */}
         <div 
           onClick={() => navigate('/books-prices')}
-          className="card p-5 cursor-pointer active:scale-[0.98] transition-all duration-200 hover:shadow-md"
+          className="tour-active-books card p-5 cursor-pointer active:scale-[0.98] transition-all duration-200 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -528,7 +528,7 @@ const Dashboard = () => {
       </div>
 
       {/* Inspirational Quote Section */}
-      <div className="card p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
+      <div className="tour-quotes card p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0 text-3xl">📖</div>
           <div className="flex-1 min-w-0">
@@ -543,7 +543,7 @@ const Dashboard = () => {
       </div>
 
       {/* Top Distributors Section */}
-      <div className="card p-5">
+      <div className="tour-top-3 card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Top Distributors</h2>
           <span className="text-sm text-gray-500">{top3.length}</span>
@@ -596,7 +596,7 @@ const Dashboard = () => {
       </div>
 
       {/* Top 10 Leaderboard */}
-      <div className="card p-5">
+      <div className="tour-leaderboard card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Top 10 Leaderboard</h2>
           <span className="text-sm text-gray-500">{top10.length}</span>

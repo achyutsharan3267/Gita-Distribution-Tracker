@@ -234,7 +234,7 @@ const DistributionForm = () => {
           ← Back
         </button>
       </div>
-      <div className="mb-6">
+      <div className="tour-form-header mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           Daily Distribution Form
         </h1>
@@ -266,7 +266,7 @@ const DistributionForm = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="tour-book-inputs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {books.map((book) => {
             const bookId = book.id || book.bookId;
             // Use bookId directly as field name (works for both standard and new books)
@@ -297,7 +297,7 @@ const DistributionForm = () => {
           })}
         </div>
 
-        <div className="border-t border-gray-100 pt-5">
+        <div className="tour-money-section border-t border-gray-100 pt-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">Money Details</h3>
           
           {(() => {
@@ -382,7 +382,7 @@ const DistributionForm = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="tour-submit-button btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Submitting...' : '📝 Submit Distribution'}
           </button>
@@ -397,7 +397,7 @@ const DistributionForm = () => {
       </form>
 
       {/* Current Stats Preview */}
-      <div className="card mt-5 p-5">
+      <div className="tour-current-totals card mt-5 p-5">
         <h3 className="text-base font-semibold text-gray-900 mb-4">Your Current Totals</h3>
         {!currentUserProfile ? (
           <p className="text-center text-gray-400 py-4 text-sm italic">

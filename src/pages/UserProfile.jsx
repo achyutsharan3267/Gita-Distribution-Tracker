@@ -229,7 +229,7 @@ const UserProfile = () => {
       </div>
 
       {/* Profile Header */}
-      <div className="card p-4 sm:p-5">
+      <div className="tour-profile-header card p-4 sm:p-5">
         <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
           <img
             src={user.photo}
@@ -320,7 +320,7 @@ const UserProfile = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className={`grid gap-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+      <div className={`tour-profile-stats grid gap-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
         {books.map((book) => {
           const bookId = book.id || book.bookId;
           const value = getBookValue(user, bookId);
@@ -339,7 +339,7 @@ const UserProfile = () => {
       </div>
 
       {/* Sadhna Rounds Graph */}
-      <div className="card p-5">
+      <div className="tour-sadhna-graph card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <span className="mr-2">📿</span>
@@ -549,7 +549,7 @@ const UserProfile = () => {
         </div>
 
       {/* Activity History */}
-      <div className="card p-5">
+        <div className="tour-activity-history card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <span className="mr-2">📅</span>

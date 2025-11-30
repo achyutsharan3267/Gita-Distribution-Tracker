@@ -666,7 +666,7 @@ const AdminDashboard = () => {
 
       {/* Management Tiles - Always visible */}
       {activeSection === 'tiles' && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="tour-admin-tiles grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Manage Users Tile */}
         <div
           onClick={() => setActiveSection('users')}
