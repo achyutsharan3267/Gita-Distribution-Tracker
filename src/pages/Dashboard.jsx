@@ -204,13 +204,36 @@ const Dashboard = () => {
                     <span className="text-xl">🏆</span>
                     <p className="text-xs text-gray-600 font-medium">Your Rank</p>
                   </div>
-                  <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                    {(() => {
-                      const rankIndex = leaderboard.findIndex(u => u.id === currentUserProfile.id);
-                      return rankIndex >= 0 ? `#${rankIndex + 1}` : '—';
-                    })()}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Leaderboard position</p>
+                  {(() => {
+                    // Calculate user's total books
+                    const userTotalBooks = books.reduce((sum, book) => {
+                      const bookId = book.id || book.bookId;
+                      return sum + getBookValue(currentUserProfile, bookId);
+                    }, 0);
+                    
+                    // If user has no books distributed, show "not yet participate"
+                    if (userTotalBooks === 0) {
+                      return (
+                        <>
+                          <p className="text-base sm:text-lg font-semibold text-gray-500 italic">
+                            Not yet participate
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Start distributing books</p>
+                        </>
+                      );
+                    }
+                    
+                    // Find rank in active leaderboard (only users with books > 0)
+                    const rankIndex = activeLeaderboard.findIndex(u => u.id === currentUserProfile.id);
+                    return (
+                      <>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                          {rankIndex >= 0 ? `#${rankIndex + 1}` : '—'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Leaderboard position</p>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
