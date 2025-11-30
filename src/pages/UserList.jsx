@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { getBookValue, mapBookIdToUserProperty } from '../utils/bookMapping';
 import * as XLSX from 'xlsx';
 
 const UserList = () => {
+  const navigate = useNavigate();
   const users = useStore((state) => state.users);
   const leaderboard = useStore((state) => state.getLeaderboard());
   const books = useStore((state) => state.books);
@@ -105,6 +106,16 @@ const UserList = () => {
 
   return (
     <div className="space-y-5">
+      {/* Back Button */}
+      <div>
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center text-sm sm:text-base text-spiritual-600 hover:text-spiritual-700 font-medium"
+        >
+          ← Back
+        </button>
+      </div>
+      
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           All Devotees

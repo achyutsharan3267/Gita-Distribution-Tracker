@@ -543,9 +543,15 @@ const AdminDashboard = () => {
           </h1>
           <p className="text-sm sm:text-base text-gray-600">Manage users, profiles, and system settings</p>
         </div>
-        <Link to="/" className="btn-secondary text-sm sm:text-base text-center sm:text-left whitespace-nowrap">
-          ← Back to Dashboard
-        </Link>
+        {/* Only show top back button when on tiles view */}
+        {activeSection === 'tiles' && (
+          <button 
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center text-sm sm:text-base text-spiritual-600 hover:text-spiritual-700 font-medium"
+          >
+            ← Back
+          </button>
+        )}
       </div>
 
       {/* Management Tiles - Always visible */}
@@ -662,36 +668,51 @@ const AdminDashboard = () => {
         <div className="flex justify-start">
           <button
             onClick={() => setActiveSection('tiles')}
-            className="btn-secondary text-sm sm:text-base"
+            className="inline-flex items-center text-sm sm:text-base text-spiritual-600 hover:text-spiritual-700 font-medium"
           >
-            ← Back to Dashboard
+            ← Back
           </button>
         </div>
       )}
 
       {/* Stats Overview - Only show in Manage Users section */}
       {activeSection === 'users' && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
-        <div className="card bg-gradient-to-r from-spiritual-500 to-primary-500 text-white p-4 sm:p-6">
-          <p className="text-xs sm:text-sm opacity-90">Total Users</p>
-          <p className="text-2xl sm:text-3xl font-bold">{users.length}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="card p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">👥</span>
+            <p className="text-xs text-gray-600 font-medium">Total Users</p>
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900">{users.length}</p>
+          <p className="text-xs text-gray-500 mt-1">Registered devotees</p>
         </div>
-        <div className="card bg-green-500 text-white p-4 sm:p-6">
-          <p className="text-xs sm:text-sm opacity-90">Total Books Distributed</p>
-          <p className="text-2xl sm:text-3xl font-bold">
+        <div className="card p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">📚</span>
+            <p className="text-xs text-gray-600 font-medium">Total Books Distributed</p>
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900">
             {books.reduce((sum, book) => {
               const bookId = book.id || book.bookId;
               return sum + getStatsBookValue(totalStats, bookId);
-            }, 0)}
+            }, 0).toLocaleString()}
           </p>
+          <p className="text-xs text-gray-500 mt-1">All books combined</p>
         </div>
-        <div className="card bg-purple-500 text-white p-4 sm:p-6">
-          <p className="text-xs sm:text-sm opacity-90">Total Money Collected</p>
-          <p className="text-2xl sm:text-3xl font-bold">₹{totalStats.totalMoney.toLocaleString()}</p>
+        <div className="card p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">💰</span>
+            <p className="text-xs text-gray-600 font-medium">Total Money Collected</p>
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">₹{totalStats.totalMoney.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-1">Total collected</p>
         </div>
-        <div className="card bg-blue-500 text-white p-4 sm:p-6">
-          <p className="text-xs sm:text-sm opacity-90">Active Devotees</p>
-          <p className="text-2xl sm:text-3xl font-bold">
+        <div className="card p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">✨</span>
+            <p className="text-xs text-gray-600 font-medium">Active Devotees</p>
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900">
             {users.filter(u => {
               const total = books.reduce((sum, book) => {
                 const bookId = book.id || book.bookId;
@@ -700,6 +721,7 @@ const AdminDashboard = () => {
               return total > 0;
             }).length}
           </p>
+          <p className="text-xs text-gray-500 mt-1">With books distributed</p>
         </div>
       </div>
       )}

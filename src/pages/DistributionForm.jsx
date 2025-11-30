@@ -224,7 +224,16 @@ const DistributionForm = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-4">
+      {/* Back Button */}
+      <div>
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center text-sm sm:text-base text-spiritual-600 hover:text-spiritual-700 font-medium"
+        >
+          ← Back
+        </button>
+      </div>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           Daily Distribution Form

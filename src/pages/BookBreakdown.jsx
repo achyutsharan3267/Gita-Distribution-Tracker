@@ -1,9 +1,10 @@
 import { useStore } from '../store/useStore';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { getStatsBookValue } from '../utils/bookMapping';
 
 const BookBreakdown = () => {
+  const navigate = useNavigate();
   const totalStats = useStore((state) => state.getTotalStats());
   const books = useStore((state) => state.books);
   const loadBooks = useStore((state) => state.loadBooks);
@@ -54,12 +55,12 @@ const BookBreakdown = () => {
     <div className="space-y-5">
       {/* Back Button */}
       <div>
-        <Link
-          to="/"
+        <button
+          onClick={() => navigate(-1)}
           className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700 font-medium"
         >
-          ← Back to Dashboard
-        </Link>
+          ← Back
+        </button>
       </div>
 
       {/* Page Header */}

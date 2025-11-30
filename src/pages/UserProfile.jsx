@@ -158,12 +158,12 @@ const UserProfile = () => {
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
       {/* Back Button and Edit Button */}
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4">
-        <Link
-          to="/users"
+        <button
+          onClick={() => navigate(-1)}
           className="inline-flex items-center text-sm sm:text-base text-spiritual-600 hover:text-spiritual-700 font-medium"
         >
-          ← Back to Devotees List
-        </Link>
+          ← Back
+        </button>
         {isOwnProfile && (
           <Link
             to="/edit-profile"

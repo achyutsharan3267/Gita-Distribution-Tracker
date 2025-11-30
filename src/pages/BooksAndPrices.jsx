@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 
 const BooksAndPrices = () => {
+  const navigate = useNavigate();
   const books = useStore((state) => state.books);
   const loadBooks = useStore((state) => state.loadBooks);
 
@@ -14,12 +15,12 @@ const BooksAndPrices = () => {
     <div className="max-w-6xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
       {/* Back Button */}
       <div>
-        <Link
-          to="/"
+        <button
+          onClick={() => navigate(-1)}
           className="inline-flex items-center text-sm sm:text-base text-spiritual-600 hover:text-spiritual-700 font-medium"
         >
-          ← Back to Dashboard
-        </Link>
+          ← Back
+        </button>
       </div>
 
       {/* Page Header */}
@@ -73,24 +74,24 @@ const BooksAndPrices = () => {
       </div>
 
       {/* Summary Card */}
-      <div className="card bg-gradient-to-r from-spiritual-500 to-primary-500 text-white p-3 sm:p-4">
-        <h2 className="text-base sm:text-lg font-bold mb-3">📊 Price Summary</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+      <div className="card bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100 p-4 sm:p-5">
+        <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">📊 Price Summary</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           {books.map((book) => {
             const bookId = book.id || book.bookId;
             return (
-              <div key={bookId} className="text-center">
-                <p className="text-xs text-spiritual-100 mb-1 truncate">
+              <div key={bookId} className="bg-white/60 rounded-xl p-3 text-center hover:bg-white/80 transition-colors">
+                <p className="text-xs text-gray-600 mb-1 truncate font-medium">
                   {book.name.split(' ')[0]}
                 </p>
-                <p className="text-base sm:text-lg font-bold">₹{book.price || 0}</p>
+                <p className="text-base sm:text-lg font-bold text-gray-900">₹{book.price || 0}</p>
               </div>
             );
           })}
         </div>
-        <div className="mt-3 pt-3 border-t border-spiritual-400/30">
-          <p className="text-xs sm:text-sm text-spiritual-100">
-            💡 <strong>Note:</strong> Prices are per book. Total amount collected may vary based on quantity distributed.
+        <div className="mt-4 pt-4 border-t border-primary-200">
+          <p className="text-xs sm:text-sm text-gray-600">
+            💡 <strong className="text-gray-900">Note:</strong> Prices are per book. Total amount collected may vary based on quantity distributed.
           </p>
         </div>
       </div>
