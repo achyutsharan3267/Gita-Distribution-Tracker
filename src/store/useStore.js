@@ -173,10 +173,8 @@ export const useStore = create((set, get) => ({
         .select('*')
         .eq('user_id', userId);
       
-      // Non-admin users see approved activities, but can see their own pending/rejected if showAllStatuses is true
-      if (!isAdmin && !showAllStatuses) {
-        query = query.eq('approval_status', 'approved');
-      }
+      // All activities are auto-approved, so show all activities
+      // No filtering needed - all activities are visible
       
       const { data, error } = await query.order('date', { ascending: false });
 
@@ -299,26 +297,14 @@ export const useStore = create((set, get) => ({
       let activities = null;
       let activitiesError = null;
       
-      // Try to fetch only approved activities first
-      const { data: approvedActivities, error: approvedError } = await supabase
+      // Fetch all activities - all are auto-approved, no filtering needed
+      const { data: allActivities, error: allError } = await supabase
         .from('activities')
         .select('*')
-        .eq('approval_status', 'approved')
         .order('date', { ascending: false });
       
-      if (approvedError && approvedError.message?.includes('approval_status')) {
-        // Column doesn't exist, fetch all and filter manually
-        console.log('approval_status column not found, fetching all activities...');
-        const { data: allActivities, error: allError } = await supabase
-          .from('activities')
-          .select('*')
-          .order('date', { ascending: false });
-        activities = allActivities?.filter(a => !a.approval_status || a.approval_status === 'approved') || [];
-        activitiesError = allError;
-      } else {
-        activities = approvedActivities;
-        activitiesError = approvedError;
-      }
+      activities = allActivities || [];
+      activitiesError = allError;
 
       if (activitiesError) {
         console.error('Error fetching activities:', activitiesError);
@@ -351,11 +337,9 @@ export const useStore = create((set, get) => ({
       console.log(`Loaded ${bookDistributions?.length || 0} book distributions`);
 
       // Aggregate book distributions by user_id and book_id
-      // Only count distributions from APPROVED activities
+      // All activities are auto-approved, so count all
       const approvedActivityIds = new Set(
-        activities
-          ?.filter(a => a.approval_status === 'approved')
-          .map(a => a.id) || []
+        activities?.map(a => a.id) || []
       );
       
       const bookDistributionsByUser = {};
@@ -379,8 +363,8 @@ export const useStore = create((set, get) => ({
         if (!activitiesByUser[activity.user_id]) {
           activitiesByUser[activity.user_id] = [];
         }
-        // Only add approved activities to the list (pending/rejected won't be in totals)
-        if (activity.approval_status === 'approved') {
+        // All activities are auto-approved, so add all
+        if (activity) {
           activitiesByUser[activity.user_id].push(transformActivity(activity));
         }
       });
@@ -574,10 +558,7 @@ export const useStore = create((set, get) => ({
         }
       }
 
-      // DON'T update user totals yet - activity is pending approval
-      // Totals will be updated only when admin approves the activity
-
-      // Insert new activity with pending approval status
+      // Insert new activity with approved status (auto-approved, no approval needed)
       const { data: activityData, error: activityError } = await supabase
         .from('activities')
         .insert([
@@ -593,7 +574,7 @@ export const useStore = create((set, get) => ({
             money_received: distribution.moneyReceived || 0,
             money_online: distribution.moneyOnline || 0,
             money_offline: distribution.moneyOffline || 0,
-            approval_status: 'pending', // New activities require admin approval
+            approval_status: 'approved', // Activities are auto-approved and show immediately
           },
         ])
         .select()
@@ -652,35 +633,121 @@ export const useStore = create((set, get) => ({
         }
       }
 
-      // Reload activities with book distributions from database
-      const updatedActivities = await get().loadUserActivities(userId, false, true); // Show all statuses for own profile
-      
-      // Update local state - DON'T update totals since activity is pending
-      // Only update activities list
-      set((state) => {
-        const updatedUsers = state.users.map((u) =>
-          u.id === userId
-            ? {
-                ...u,
-                activities: updatedActivities, // Use reloaded activities with book distributions
-              }
-            : u
-        );
+      // Update user totals immediately since activity is auto-approved
+      // Reuse the user variable already declared above
+      if (user) {
+        // Calculate new totals by adding activity values
+        const newHindiGita = (user.hindiGita || 0) + (distribution.hindiGita || 0);
+        const newEnglishGita = (user.englishGita || 0) + (distribution.englishGita || 0);
+        const newSmallBooks = (user.smallBooks || 0) + (distribution.smallBooks || 0);
+        const newBhagavatam = (user.bhagavatam || 0) + (distribution.bhagavatam || 0);
+        const newChaitanyaCharitamrita = (user.chaitanyaCharitamrita || 0) + (distribution.chaitanyaCharitamrita || 0);
+        const newOtherBooks = (user.otherBooks || 0) + (distribution.otherBooks || 0);
+        const newTotalMoney = (user.totalMoney || 0) + parseFloat(distribution.moneyReceived || 0);
 
-        // Update currentUserProfile if it's the same user
-        const updatedCurrentUserProfile = 
-          state.currentUserProfile?.id === userId
-            ? {
-                ...state.currentUserProfile,
-                activities: updatedActivities, // Use reloaded activities with book distributions
-              }
-            : state.currentUserProfile;
+        // Update user totals in database
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            hindi_gita: newHindiGita,
+            english_gita: newEnglishGita,
+            small_books: newSmallBooks,
+            bhagavatam: newBhagavatam,
+            chaitanya_charitamrita: newChaitanyaCharitamrita,
+            other_books: newOtherBooks,
+            total_money: newTotalMoney,
+          })
+          .eq('id', userId);
 
-        return {
-          users: updatedUsers,
-          currentUserProfile: updatedCurrentUserProfile,
-        };
-      });
+        if (updateError) throw updateError;
+
+        // Get book distributions for this activity
+        const { data: bookDistributions } = await supabase
+          .from('book_distributions')
+          .select('*')
+          .eq('activity_id', activityData.id);
+
+        // Update user's bookDistributions object
+        const updatedBookDistributions = { ...(user.bookDistributions || {}) };
+        if (bookDistributions && Array.isArray(bookDistributions)) {
+          bookDistributions.forEach(bd => {
+            if (bd && bd.book_id) {
+              updatedBookDistributions[bd.book_id] = (updatedBookDistributions[bd.book_id] || 0) + (bd.count || 0);
+            }
+          });
+        }
+
+        // Reload activities with book distributions from database
+        const updatedActivities = await get().loadUserActivities(userId, false, true); // Show all statuses for own profile
+        
+        // Update local state with new totals and activities
+        set((state) => {
+          const updatedUsers = state.users.map((u) =>
+            u.id === userId
+              ? {
+                  ...u,
+                  hindiGita: newHindiGita,
+                  englishGita: newEnglishGita,
+                  smallBooks: newSmallBooks,
+                  bhagavatam: newBhagavatam,
+                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
+                  otherBooks: newOtherBooks,
+                  totalMoney: newTotalMoney,
+                  bookDistributions: updatedBookDistributions,
+                  activities: updatedActivities || [], // Use reloaded activities with book distributions
+                }
+              : u
+          );
+
+          // Update currentUserProfile if it's the same user
+          const updatedCurrentUserProfile = 
+            state.currentUserProfile?.id === userId
+              ? {
+                  ...state.currentUserProfile,
+                  hindiGita: newHindiGita,
+                  englishGita: newEnglishGita,
+                  smallBooks: newSmallBooks,
+                  bhagavatam: newBhagavatam,
+                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
+                  otherBooks: newOtherBooks,
+                  totalMoney: newTotalMoney,
+                  bookDistributions: updatedBookDistributions,
+                  activities: updatedActivities || [], // Use reloaded activities with book distributions
+                }
+              : state.currentUserProfile;
+
+          return {
+            users: updatedUsers,
+            currentUserProfile: updatedCurrentUserProfile,
+          };
+        });
+      } else {
+        // If user not found in state, just reload activities
+        const updatedActivities = await get().loadUserActivities(userId, false, true);
+        set((state) => {
+          const updatedUsers = state.users.map((u) =>
+            u.id === userId
+              ? {
+                  ...u,
+                  activities: updatedActivities || [],
+                }
+              : u
+          );
+
+          const updatedCurrentUserProfile = 
+            state.currentUserProfile?.id === userId
+              ? {
+                  ...state.currentUserProfile,
+                  activities: updatedActivities || [],
+                }
+              : state.currentUserProfile;
+
+          return {
+            users: updatedUsers,
+            currentUserProfile: updatedCurrentUserProfile,
+          };
+        });
+      }
     } catch (error) {
       console.error('Error updating distribution:', error);
       set({ error: error.message });
@@ -936,29 +1003,14 @@ export const useStore = create((set, get) => ({
             return;
           }
           
-          // Refresh activities for all users - ONLY APPROVED activities for totals
+          // Refresh activities for all users - all are auto-approved
           const { data: activities, error } = await supabase
             .from('activities')
             .select('*')
-            .eq('approval_status', 'approved') // Only approved activities count in totals
             .order('date', { ascending: false });
 
           if (error) {
             console.error('Error refreshing activities:', error);
-            // If approval_status column doesn't exist, try without filter
-            if (error.message?.includes('approval_status')) {
-              const { data: allActivities } = await supabase
-                .from('activities')
-                .select('*')
-                .order('date', { ascending: false });
-              if (allActivities) {
-                // Filter manually
-                const approvedActivities = allActivities.filter(a => 
-                  !a.approval_status || a.approval_status === 'approved'
-                );
-                await updateActivitiesInStore(approvedActivities);
-              }
-            }
             return;
           }
 
