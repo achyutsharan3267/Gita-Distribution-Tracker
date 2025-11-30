@@ -271,9 +271,12 @@ const DistributionForm = () => {
             const bookId = book.id || book.bookId;
             // Use bookId directly as field name (works for both standard and new books)
             return (
-              <div key={bookId}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {book.icon ? `${book.icon} ` : ''}{book.name}
+              <div key={bookId} className="min-w-0 flex flex-col">
+                <label className="block text-sm font-medium text-gray-700 mb-2 min-w-0 h-10 flex items-start">
+                  <span className="flex items-start gap-1.5 w-full">
+                    {book.icon && <span className="flex-shrink-0 mt-0.5">{book.icon}</span>}
+                    <span className="break-words line-clamp-2 min-w-0 leading-tight">{book.name}</span>
+                  </span>
                 </label>
                 <input
                   type="number"
@@ -281,11 +284,11 @@ const DistributionForm = () => {
                   value={formData[bookId] || ''}
                   onChange={handleChange}
                   min="0"
-                  className="input-field"
+                  className="input-field w-full"
                   placeholder="0"
                 />
                 {book.description && (
-                  <p className="text-xs text-gray-500 mt-1.5">
+                  <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 break-words">
                     {book.description}
                   </p>
                 )}
@@ -409,9 +412,9 @@ const DistributionForm = () => {
               // Use getBookValue which handles both bookDistributions and standard columns
               const value = getBookValue(currentUserProfile, bookId);
               return (
-                <div key={bookId} className="bg-gray-50 rounded-xl p-3 text-center">
+                <div key={bookId} className="bg-gray-50 rounded-xl p-3 text-center min-w-0">
                   <p className="text-lg font-bold text-gray-900">{value || 0}</p>
-                  <p className="text-xs text-gray-500 truncate mt-1">{book.name}</p>
+                  <p className="text-xs text-gray-500 truncate mt-1 break-words line-clamp-2" title={book.name}>{book.name}</p>
                 </div>
               );
             })}
