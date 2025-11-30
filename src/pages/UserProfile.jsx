@@ -130,7 +130,7 @@ const UserProfile = () => {
       </div>
 
       {/* Profile Header */}
-      <div className="card p-5">
+      <div className="card p-4 sm:p-5">
         <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
           <img
             src={user.photo}
@@ -138,7 +138,7 @@ const UserProfile = () => {
             className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gray-200 flex-shrink-0 object-cover"
           />
           <div className="flex-1 text-center md:text-left w-full">
-            <h1 className="text-2xl font-semibold text-gray-900 mb-2 break-words flex items-center justify-center md:justify-start gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2 break-words flex items-center justify-center md:justify-start gap-2 flex-wrap">
               {user.name}
               {user.isAdmin && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-900 text-white">
@@ -146,25 +146,76 @@ const UserProfile = () => {
                 </span>
               )}
             </h1>
-            <div className="space-y-1 mb-4">
+            <div className="space-y-1 mb-3 sm:mb-4">
               {user.city && (
-                <p className="text-sm text-gray-600 break-words">📍 {user.city}</p>
+                <p className="text-xs sm:text-sm text-gray-600 break-words">📍 {user.city}</p>
               )}
               {user.mobileNumber && (
-                <p className="text-sm text-gray-600 break-words">📱 {formatMobileNumber(user.mobileNumber, isAdmin, isOwnProfile)}</p>
+                <p className="text-xs sm:text-sm text-gray-600 break-words">📱 {formatMobileNumber(user.mobileNumber, isAdmin, isOwnProfile)}</p>
               )}
-              <p className="text-sm text-gray-600 break-words">🏛️ {user.other || 'Other'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 break-words">🏛️ {user.other || 'Other'}</p>
             </div>
-            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-              <div className="bg-gray-50 rounded-xl px-4 py-3">
-                <p className="text-xs text-gray-500 mb-0.5">Total Books</p>
-                <p className="text-xl font-bold text-gray-900">{totalDistributed}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl px-4 py-3">
-                <p className="text-xs text-gray-500 mb-0.5">Money Collected</p>
-                <p className="text-xl font-bold text-gray-900">₹{user.totalMoney.toLocaleString()}</p>
-              </div>
-            </div>
+            {(() => {
+              // Calculate Amount as per Books based on user's total books
+              let amountAsPerBooks = 0;
+              books.forEach(book => {
+                const bookId = book.id || book.bookId;
+                const count = getBookValue(user, bookId);
+                const price = parseFloat(book.price || 0);
+                amountAsPerBooks += count * price;
+              });
+
+              // Calculate Insufficient Funds (if Amount as per Books > Total Money Collected)
+              const insufficientFunds = amountAsPerBooks > user.totalMoney 
+                ? amountAsPerBooks - user.totalMoney 
+                : 0;
+
+              // Calculate Donation Amount (if Total Money Collected > Amount as per Books)
+              const donationAmount = user.totalMoney > amountAsPerBooks 
+                ? user.totalMoney - amountAsPerBooks 
+                : 0;
+
+              return (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                      <p className="text-xs text-gray-500 mb-0.5">Total Books</p>
+                      <p className="text-lg sm:text-xl font-bold text-gray-900">{totalDistributed}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                      <p className="text-xs text-gray-500 mb-0.5">Money Collected</p>
+                      <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
+                        ₹{user.totalMoney.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 col-span-2 lg:col-span-1">
+                      <p className="text-xs text-gray-500 mb-0.5">Amount as per Books</p>
+                      <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
+                        ₹{amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {insufficientFunds > 0 ? (
+                      <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                        <p className="text-xs text-red-600 mb-0.5">Insufficient Funds</p>
+                        <p className="text-lg sm:text-xl font-bold text-red-600 break-words">
+                          ₹{insufficientFunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className={`rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 ${donationAmount > 0 ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                        <p className={`text-xs mb-0.5 ${donationAmount > 0 ? 'text-green-600' : 'text-gray-600'}`}>Donation Amount</p>
+                        <p className={`text-lg sm:text-xl font-bold break-words ${donationAmount > 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                          ₹{donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -229,11 +280,11 @@ const UserProfile = () => {
               return (
                 <div
                   key={mergedActivity.date}
-                  className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors"
+                  className="border border-gray-200 rounded-xl p-3 sm:p-4 hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-base break-words">
+                      <p className="font-semibold text-gray-900 text-sm sm:text-base break-words">
                         {formatDate(mergedActivity.date)}
                       </p>
                       {hasMultipleEntries && (
@@ -243,25 +294,25 @@ const UserProfile = () => {
                       )}
                     </div>
                     <div className="text-left sm:text-right flex-shrink-0">
-                      <p className="text-lg font-bold text-gray-900">
+                      <p className="text-base sm:text-lg font-bold text-gray-900">
                         {totalBooks} books
                       </p>
                       {mergedActivity.moneyReceived > 0 && (
-                        <p className="text-xs text-gray-600 mt-0.5">
+                        <p className="text-xs text-gray-600 mt-0.5 break-words">
                           ₹{mergedActivity.moneyReceived.toLocaleString()}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className={`grid gap-2 mb-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+                  <div className={`grid gap-2 mb-2 sm:mb-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
                     {books.map((book) => {
                       const bookId = book.id || book.bookId;
                       const value = mergedActivity.bookValues?.[bookId] || 0;
                       return (
-                        <div key={bookId} className="bg-gray-50 rounded-xl p-2.5">
-                          <p className="text-xs text-gray-500 mb-1 break-words">{book.name}</p>
-                          <p className="text-base font-semibold text-gray-900">
+                        <div key={bookId} className="bg-gray-50 rounded-xl p-2 sm:p-2.5">
+                          <p className="text-xs text-gray-500 mb-0.5 sm:mb-1 break-words line-clamp-2">{book.name}</p>
+                          <p className="text-sm sm:text-base font-semibold text-gray-900">
                             {value}
                           </p>
                         </div>
@@ -269,33 +320,90 @@ const UserProfile = () => {
                     })}
                   </div>
 
-                  {mergedActivity.moneyReceived > 0 && (
-                    <div className="border-t border-gray-100 pt-3 mt-3">
-                      <p className="text-xs font-medium text-gray-500 mb-2">
-                        Money Details
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div className="bg-gray-50 rounded-xl p-3">
-                          <p className="text-xs text-gray-500 mb-0.5">Total Received</p>
-                          <p className="font-semibold text-gray-900">
-                            ₹{mergedActivity.moneyReceived.toLocaleString()}
-                          </p>
+                  {mergedActivity.moneyReceived > 0 && (() => {
+                    // Calculate Amount as per Books based on books distributed in THIS activity
+                    let amountAsPerBooks = 0;
+                    books.forEach(book => {
+                      const bookId = book.id || book.bookId;
+                      const count = mergedActivity.bookValues?.[bookId] || 0;
+                      const price = parseFloat(book.price || 0);
+                      amountAsPerBooks += count * price;
+                    });
+
+                    // Calculate Total Received Amount (Online + Offline)
+                    const onlineAmount = mergedActivity.moneyOnline || 0;
+                    const offlineAmount = mergedActivity.moneyOffline || 0;
+                    const totalReceivedAmount = onlineAmount + offlineAmount;
+
+                    // Calculate Insufficient Funds (if Amount as per Books > Total Received)
+                    const insufficientFunds = amountAsPerBooks > totalReceivedAmount 
+                      ? amountAsPerBooks - totalReceivedAmount 
+                      : 0;
+
+                    // Calculate Donation Amount (if Total Received > Amount as per Books)
+                    const donationAmount = totalReceivedAmount > amountAsPerBooks 
+                      ? totalReceivedAmount - amountAsPerBooks 
+                      : 0;
+
+                    return (
+                      <div className="border-t border-gray-100 pt-3 mt-3">
+                        <p className="text-xs font-medium text-gray-500 mb-3">
+                          Money Details
+                        </p>
+                        
+                        {/* Input Fields Display */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                          <div className="bg-gray-50 rounded-xl p-2.5 sm:p-3">
+                            <p className="text-xs text-gray-500 mb-0.5">Online Amount (₹)</p>
+                            <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">
+                              ₹{onlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 rounded-xl p-2.5 sm:p-3">
+                            <p className="text-xs text-gray-500 mb-0.5">Offline Amount (₹)</p>
+                            <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">
+                              ₹{offlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
                         </div>
-                        <div className="bg-gray-50 rounded-xl p-3">
-                          <p className="text-xs text-gray-500 mb-0.5">Online</p>
-                          <p className="font-semibold text-gray-900">
-                            ₹{mergedActivity.moneyOnline.toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="bg-gray-50 rounded-xl p-3">
-                          <p className="text-xs text-gray-500 mb-0.5">Offline</p>
-                          <p className="font-semibold text-gray-900">
-                            ₹{mergedActivity.moneyOffline.toLocaleString()}
-                          </p>
+
+                        {/* Calculated Fields */}
+                        <div className="bg-gray-50 rounded-xl p-2.5 sm:p-3 space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Total Received Amount (₹)</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
+                              ₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Amount as per Books (₹)</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
+                              ₹{amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+
+                          {insufficientFunds > 0 && (
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-red-600">Insufficient Funds (₹)</span>
+                              <span className="text-xs sm:text-sm font-semibold text-red-600 break-words">
+                                ₹{insufficientFunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
+
+                          {donationAmount > 0 && (
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-green-600">Donation Amount (₹)</span>
+                              <span className="text-xs sm:text-sm font-semibold text-green-600 break-words">
+                                ₹{donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}

@@ -31,7 +31,6 @@ const DistributionForm = () => {
   }
 
   const [formData, setFormData] = useState({
-    moneyReceived: '',
     moneyOnline: '',
     moneyOffline: '',
   });
@@ -55,7 +54,6 @@ const DistributionForm = () => {
   useEffect(() => {
     if (books.length > 0) {
       const initialFormData = {
-        moneyReceived: '',
         moneyOnline: '',
         moneyOffline: '',
       };
@@ -77,6 +75,40 @@ const DistributionForm = () => {
     }
   }, [books]);
 
+  // Calculate derived values
+  const calculateAmounts = () => {
+    // Calculate Amount as per Books
+    let amountAsPerBooks = 0;
+    books.forEach(book => {
+      const bookId = book.id || book.bookId;
+      const count = Number(formData[bookId]) || 0;
+      const price = parseFloat(book.price || 0);
+      amountAsPerBooks += count * price;
+    });
+
+    // Calculate Total Received Amount (Online + Offline)
+    const onlineAmount = Number(formData.moneyOnline) || 0;
+    const offlineAmount = Number(formData.moneyOffline) || 0;
+    const totalReceivedAmount = onlineAmount + offlineAmount;
+
+    // Calculate Insufficient Funds (if Amount as per Books > Total Received)
+    const insufficientFunds = amountAsPerBooks > totalReceivedAmount 
+      ? amountAsPerBooks - totalReceivedAmount 
+      : 0;
+
+    // Calculate Donation Amount (if Total Received > Amount as per Books)
+    const donationAmount = totalReceivedAmount > amountAsPerBooks 
+      ? totalReceivedAmount - amountAsPerBooks 
+      : 0;
+
+    return {
+      amountAsPerBooks,
+      totalReceivedAmount,
+      insufficientFunds,
+      donationAmount
+    };
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -92,21 +124,8 @@ const DistributionForm = () => {
   const validate = () => {
     const newErrors = {};
     
-    // Validate money: online + offline should be <= total money received
-    if (formData.moneyReceived) {
-      const totalReceived = Number(formData.moneyReceived) || 0;
-      const online = Number(formData.moneyOnline) || 0;
-      const offline = Number(formData.moneyOffline) || 0;
-      const totalPaid = online + offline;
-      
-      // Total paid should be less than or equal to total received
-      if (totalPaid > totalReceived) {
-        newErrors.moneyMismatch = `Total paid (₹${totalPaid.toLocaleString()}) cannot be more than total received (₹${totalReceived.toLocaleString()})`;
-      }
-      
-      // If both online and offline are 0, but money received is entered, that's okay
-      // User might want to record money received without breaking it down
-    }
+    // No specific validation needed for money fields
+    // All calculations are done automatically
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -121,9 +140,12 @@ const DistributionForm = () => {
 
     setIsSubmitting(true);
 
+    // Calculate amounts
+    const amounts = calculateAmounts();
+
     // Build distribution object dynamically from active books
     const distribution = {
-      moneyReceived: Number(formData.moneyReceived) || 0,
+      moneyReceived: amounts.totalReceivedAmount,
       moneyOnline: Number(formData.moneyOnline) || 0,
       moneyOffline: Number(formData.moneyOffline) || 0,
       newBooks: [], // For books not in standard mapping
@@ -177,7 +199,6 @@ const DistributionForm = () => {
 
       // Reset form dynamically
       const resetFormData = {
-        moneyReceived: '',
         moneyOnline: '',
         moneyOffline: '',
       };
@@ -267,63 +288,82 @@ const DistributionForm = () => {
         <div className="border-t border-gray-100 pt-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">Money Details</h3>
           
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Total Money Received (₹)
-              </label>
-              <input
-                type="number"
-                name="moneyReceived"
-                value={formData.moneyReceived}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                className="input-field"
-                placeholder="0.00"
-              />
-            </div>
+          {(() => {
+            const amounts = calculateAmounts();
+            return (
+              <div className="space-y-4">
+                {/* Input Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Online Amount (₹)
+                    </label>
+                    <input
+                      type="number"
+                      name="moneyOnline"
+                      value={formData.moneyOnline}
+                      onChange={handleChange}
+                      min="0"
+                      step="0.01"
+                      className="input-field"
+                      placeholder="0.00"
+                    />
+                  </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Money Paid Online (₹)
-                </label>
-                <input
-                  type="number"
-                  name="moneyOnline"
-                  value={formData.moneyOnline}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  className="input-field"
-                  placeholder="0.00"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Offline Amount (₹)
+                    </label>
+                    <input
+                      type="number"
+                      name="moneyOffline"
+                      value={formData.moneyOffline}
+                      onChange={handleChange}
+                      min="0"
+                      step="0.01"
+                      className="input-field"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Money Paid Offline (₹)
-                </label>
-                <input
-                  type="number"
-                  name="moneyOffline"
-                  value={formData.moneyOffline}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  className="input-field"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
+                {/* Calculated Fields */}
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Total Received Amount (₹)</span>
+                    <span className="text-base font-semibold text-gray-900">
+                      {amounts.totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
 
-            {errors.moneyMismatch && (
-              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2.5 rounded-xl text-sm">
-                {errors.moneyMismatch}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Amount as per Books (₹)</span>
+                    <span className="text-base font-semibold text-gray-900">
+                      {amounts.amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {amounts.insufficientFunds > 0 && (
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                      <span className="text-sm font-medium text-red-600">Insufficient Funds (₹)</span>
+                      <span className="text-base font-semibold text-red-600">
+                        {amounts.insufficientFunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+
+                  {amounts.donationAmount > 0 && (
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                      <span className="text-sm font-medium text-green-600">Donation Amount (₹)</span>
+                      <span className="text-base font-semibold text-green-600">
+                        {amounts.donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })()}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100">

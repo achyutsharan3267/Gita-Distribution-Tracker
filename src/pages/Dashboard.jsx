@@ -90,55 +90,133 @@ const Dashboard = () => {
       </div>
 
       {/* User's Personal Stats - Only if logged in */}
-      {currentUserProfile && (
-        <div className="card p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-900">Your Contribution</h2>
-            <span className="text-2xl">🙏</span>
+      {currentUserProfile && (() => {
+        // Calculate Amount as per Books based on user's total books
+        let amountAsPerBooks = 0;
+        books.forEach(book => {
+          const bookId = book.id || book.bookId;
+          const count = getBookValue(currentUserProfile, bookId);
+          const price = parseFloat(book.price || 0);
+          amountAsPerBooks += count * price;
+        });
+
+        // Calculate Insufficient Funds (if Amount as per Books > Total Money Collected)
+        const insufficientFunds = amountAsPerBooks > currentUserProfile.totalMoney 
+          ? amountAsPerBooks - currentUserProfile.totalMoney 
+          : 0;
+
+        // Calculate Donation Amount (if Total Money Collected > Amount as per Books)
+        const donationAmount = currentUserProfile.totalMoney > amountAsPerBooks 
+          ? currentUserProfile.totalMoney - amountAsPerBooks 
+          : 0;
+
+        return (
+          <div className="card p-4 sm:p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-900">Your Contribution</h2>
+              <span className="text-2xl">🙏</span>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="bg-white/60 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">📚</span>
+                    <p className="text-xs text-gray-600 font-medium">Your Books</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                    {books.reduce((sum, book) => {
+                      const bookId = book.id || book.bookId;
+                      return sum + getBookValue(currentUserProfile, bookId);
+                    }, 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Total distributed</p>
+                </div>
+                <div className="bg-white/60 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">💰</span>
+                    <p className="text-xs text-gray-600 font-medium">Money Collected</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
+                    ₹{currentUserProfile.totalMoney.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Total collected</p>
+                </div>
+                <div className="bg-white/60 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-colors col-span-2 sm:col-span-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">📊</span>
+                    <p className="text-xs text-gray-600 font-medium">Amount as per Books</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
+                    ₹{amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Expected amount</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {insufficientFunds > 0 ? (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">⚠️</span>
+                      <p className="text-xs text-red-600 font-medium">Insufficient Funds</p>
+                    </div>
+                    <p className="text-xl sm:text-2xl font-bold text-red-600 break-words">
+                      ₹{insufficientFunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-red-500 mt-1">Loss</p>
+                  </div>
+                ) : (
+                  <div className={`rounded-xl p-3 sm:p-4 ${donationAmount > 0 ? 'bg-green-50 border border-green-200' : 'bg-white/60 hover:bg-white/80 transition-colors'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">✨</span>
+                      <p className={`text-xs font-medium ${donationAmount > 0 ? 'text-green-600' : 'text-gray-600'}`}>Donation Amount</p>
+                    </div>
+                    <p className={`text-xl sm:text-2xl font-bold break-words ${donationAmount > 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                      ₹{donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className={`text-xs mt-1 ${donationAmount > 0 ? 'text-green-500' : 'text-gray-500'}`}>
+                      {donationAmount > 0 ? 'Profit' : 'No profit'}
+                    </p>
+                  </div>
+                )}
+                <div className="bg-white/60 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">🏆</span>
+                    <p className="text-xs text-gray-600 font-medium">Your Rank</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                    {(() => {
+                      const rankIndex = leaderboard.findIndex(u => u.id === currentUserProfile.id);
+                      return rankIndex >= 0 ? `#${rankIndex + 1}` : '—';
+                    })()}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Leaderboard position</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div className="bg-white/60 rounded-xl p-4 hover:bg-white/80 transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">📚</span>
-                <p className="text-xs text-gray-600 font-medium">Your Books</p>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                {books.reduce((sum, book) => {
-                  const bookId = book.id || book.bookId;
-                  return sum + getBookValue(currentUserProfile, bookId);
-                }, 0).toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">Total distributed</p>
-            </div>
-            <div className="bg-white/60 rounded-xl p-4 hover:bg-white/80 transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">💰</span>
-                <p className="text-xs text-gray-600 font-medium">Your Money</p>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                ₹{currentUserProfile.totalMoney.toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">Total collected</p>
-            </div>
-            <div className="col-span-2 sm:col-span-1 bg-white/60 rounded-xl p-4 hover:bg-white/80 transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">🏆</span>
-                <p className="text-xs text-gray-600 font-medium">Your Rank</p>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                {(() => {
-                  const rankIndex = leaderboard.findIndex(u => u.id === currentUserProfile.id);
-                  return rankIndex >= 0 ? `#${rankIndex + 1}` : '—';
-                })()}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">Leaderboard position</p>
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Active Books Card - Clickable */}
+        <div 
+          onClick={() => navigate('/books-prices')}
+          className="card p-5 cursor-pointer active:scale-[0.98] transition-all duration-200 hover:shadow-md"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Active Books</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {books.length}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Tap to see prices →</p>
+            </div>
+            <span className="text-4xl">📖</span>
+          </div>
+        </div>
+
         {/* Total Books Card - Clickable */}
         <div 
           onClick={() => navigate('/books')}
