@@ -45,7 +45,14 @@ const Signup = () => {
     const { data: authData, error: authError } = await signUp(email, password, name);
 
     if (authError) {
-      setError(authError.message);
+      // Better error message for "User already registered"
+      let errorMessage = authError.message;
+      if (authError.message?.includes('already registered') || 
+          authError.message?.includes('already exists') ||
+          authError.message?.includes('User already registered')) {
+        errorMessage = 'This email is already registered. Please try logging in instead, or use a different email.';
+      }
+      setError(errorMessage);
       setLoading(false);
       return;
     }

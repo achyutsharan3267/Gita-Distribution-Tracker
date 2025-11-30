@@ -67,6 +67,7 @@ const transformActivity = (dbActivity) => ({
   moneyReceived: parseFloat(dbActivity.money_received || 0),
   moneyOnline: parseFloat(dbActivity.money_online || 0),
   moneyOffline: parseFloat(dbActivity.money_offline || 0),
+  approvalStatus: dbActivity.approval_status || 'approved', // pending, approved, rejected
 });
 
 export const useStore = create((set, get) => ({
@@ -165,13 +166,19 @@ export const useStore = create((set, get) => ({
   },
 
   // Load activities for a specific user
-  loadUserActivities: async (userId) => {
+  loadUserActivities: async (userId, isAdmin = false, showAllStatuses = false) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('activities')
         .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
+        .eq('user_id', userId);
+      
+      // Non-admin users see approved activities, but can see their own pending/rejected if showAllStatuses is true
+      if (!isAdmin && !showAllStatuses) {
+        query = query.eq('approval_status', 'approved');
+      }
+      
+      const { data, error } = await query.order('date', { ascending: false });
 
       if (error) throw error;
       
@@ -287,12 +294,31 @@ export const useStore = create((set, get) => ({
       
       console.log(`Loaded ${users?.length || 0} users`);
 
-      // Fetch activities for all users
+      // Fetch activities for all users - ONLY APPROVED activities for totals
       console.log('Fetching activities from database...');
-      const { data: activities, error: activitiesError } = await supabase
+      let activities = null;
+      let activitiesError = null;
+      
+      // Try to fetch only approved activities first
+      const { data: approvedActivities, error: approvedError } = await supabase
         .from('activities')
         .select('*')
+        .eq('approval_status', 'approved')
         .order('date', { ascending: false });
+      
+      if (approvedError && approvedError.message?.includes('approval_status')) {
+        // Column doesn't exist, fetch all and filter manually
+        console.log('approval_status column not found, fetching all activities...');
+        const { data: allActivities, error: allError } = await supabase
+          .from('activities')
+          .select('*')
+          .order('date', { ascending: false });
+        activities = allActivities?.filter(a => !a.approval_status || a.approval_status === 'approved') || [];
+        activitiesError = allError;
+      } else {
+        activities = approvedActivities;
+        activitiesError = approvedError;
+      }
 
       if (activitiesError) {
         console.error('Error fetching activities:', activitiesError);
@@ -325,24 +351,38 @@ export const useStore = create((set, get) => ({
       console.log(`Loaded ${bookDistributions?.length || 0} book distributions`);
 
       // Aggregate book distributions by user_id and book_id
+      // Only count distributions from APPROVED activities
+      const approvedActivityIds = new Set(
+        activities
+          ?.filter(a => a.approval_status === 'approved')
+          .map(a => a.id) || []
+      );
+      
       const bookDistributionsByUser = {};
       bookDistributions?.forEach((bd) => {
-        if (!bookDistributionsByUser[bd.user_id]) {
-          bookDistributionsByUser[bd.user_id] = {};
+        // Only count if activity is approved
+        if (approvedActivityIds.has(bd.activity_id)) {
+          if (!bookDistributionsByUser[bd.user_id]) {
+            bookDistributionsByUser[bd.user_id] = {};
+          }
+          if (!bookDistributionsByUser[bd.user_id][bd.book_id]) {
+            bookDistributionsByUser[bd.user_id][bd.book_id] = 0;
+          }
+          bookDistributionsByUser[bd.user_id][bd.book_id] += bd.count || 0;
         }
-        if (!bookDistributionsByUser[bd.user_id][bd.book_id]) {
-          bookDistributionsByUser[bd.user_id][bd.book_id] = 0;
-        }
-        bookDistributionsByUser[bd.user_id][bd.book_id] += bd.count || 0;
       });
 
       // Group activities by user_id
+      // Only include approved activities for totals (but keep all for display if needed)
       const activitiesByUser = {};
       activities?.forEach((activity) => {
         if (!activitiesByUser[activity.user_id]) {
           activitiesByUser[activity.user_id] = [];
         }
-        activitiesByUser[activity.user_id].push(transformActivity(activity));
+        // Only add approved activities to the list (pending/rejected won't be in totals)
+        if (activity.approval_status === 'approved') {
+          activitiesByUser[activity.user_id].push(transformActivity(activity));
+        }
       });
 
       // Fetch admin status for all users
@@ -534,36 +574,10 @@ export const useStore = create((set, get) => ({
         }
       }
 
-      // Calculate new totals
-      const newHindiGita = user.hindiGita + (distribution.hindiGita || 0);
-      const newEnglishGita = user.englishGita + (distribution.englishGita || 0);
-      const newSmallBooks = user.smallBooks + (distribution.smallBooks || 0);
-      const newBhagavatam = (user.bhagavatam || 0) + (distribution.bhagavatam || 0);
-      const newChaitanyaCharitamrita = (user.chaitanyaCharitamrita || 0) + (distribution.chaitanyaCharitamrita || 0);
-      const newOtherBooks = (user.otherBooks || 0) + (distribution.otherBooks || 0);
-      const newTotalMoney = user.totalMoney + (distribution.moneyReceived || 0);
+      // DON'T update user totals yet - activity is pending approval
+      // Totals will be updated only when admin approves the activity
 
-      // Calculate totals for new books (from book_distributions)
-      // This will be handled separately in the book_distributions table
-      // For now, we'll just save them to the table
-
-      // Update user totals in database
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          hindi_gita: newHindiGita,
-          english_gita: newEnglishGita,
-          small_books: newSmallBooks,
-          bhagavatam: newBhagavatam,
-          chaitanya_charitamrita: newChaitanyaCharitamrita,
-          other_books: newOtherBooks,
-          total_money: newTotalMoney,
-        })
-        .eq('id', userId);
-
-      if (updateError) throw updateError;
-
-      // Insert new activity
+      // Insert new activity with pending approval status
       const { data: activityData, error: activityError } = await supabase
         .from('activities')
         .insert([
@@ -579,6 +593,7 @@ export const useStore = create((set, get) => ({
             money_received: distribution.moneyReceived || 0,
             money_online: distribution.moneyOnline || 0,
             money_offline: distribution.moneyOffline || 0,
+            approval_status: 'pending', // New activities require admin approval
           },
         ])
         .select()
@@ -638,30 +653,15 @@ export const useStore = create((set, get) => ({
       }
 
       // Reload activities with book distributions from database
-      const updatedActivities = await get().loadUserActivities(userId);
+      const updatedActivities = await get().loadUserActivities(userId, false, true); // Show all statuses for own profile
       
-      // Update local state
-      const newActivity = updatedActivities[0] || transformActivity(activityData);
-      
-      // Update user's bookDistributions object
-      const updatedBookDistributions = { ...user.bookDistributions || {} };
-      bookDistributions.forEach(bd => {
-        updatedBookDistributions[bd.book_id] = (updatedBookDistributions[bd.book_id] || 0) + (bd.count || 0);
-      });
-      
+      // Update local state - DON'T update totals since activity is pending
+      // Only update activities list
       set((state) => {
         const updatedUsers = state.users.map((u) =>
           u.id === userId
             ? {
                 ...u,
-                hindiGita: newHindiGita,
-                englishGita: newEnglishGita,
-                smallBooks: newSmallBooks,
-                bhagavatam: newBhagavatam,
-                chaitanyaCharitamrita: newChaitanyaCharitamrita,
-                otherBooks: newOtherBooks,
-                totalMoney: newTotalMoney,
-                bookDistributions: updatedBookDistributions,
                 activities: updatedActivities, // Use reloaded activities with book distributions
               }
             : u
@@ -672,14 +672,6 @@ export const useStore = create((set, get) => ({
           state.currentUserProfile?.id === userId
             ? {
                 ...state.currentUserProfile,
-                hindiGita: newHindiGita,
-                englishGita: newEnglishGita,
-                smallBooks: newSmallBooks,
-                bhagavatam: newBhagavatam,
-                chaitanyaCharitamrita: newChaitanyaCharitamrita,
-                otherBooks: newOtherBooks,
-                totalMoney: newTotalMoney,
-                bookDistributions: updatedBookDistributions,
                 activities: updatedActivities, // Use reloaded activities with book distributions
               }
             : state.currentUserProfile;
@@ -929,15 +921,66 @@ export const useStore = create((set, get) => ({
           table: 'activities',
         },
         async (payload) => {
-          console.log('📝 Activities table changed:', payload.eventType);
+          console.log('📝 Activities table changed:', payload.eventType, payload);
           
-          // Refresh activities for all users
+          // For DELETE events, completely refresh from database
+          if (payload.eventType === 'DELETE') {
+            console.log('Activity deleted, refreshing all data...');
+            // Re-initialize to get fresh data
+            const state = get();
+            if (state.currentUserProfile?.auth_user_id) {
+              await get().initialize(state.currentUserProfile.auth_user_id);
+            } else {
+              await get().initialize();
+            }
+            return;
+          }
+          
+          // Refresh activities for all users - ONLY APPROVED activities for totals
           const { data: activities, error } = await supabase
             .from('activities')
             .select('*')
+            .eq('approval_status', 'approved') // Only approved activities count in totals
             .order('date', { ascending: false });
 
-          if (!error && activities) {
+          if (error) {
+            console.error('Error refreshing activities:', error);
+            // If approval_status column doesn't exist, try without filter
+            if (error.message?.includes('approval_status')) {
+              const { data: allActivities } = await supabase
+                .from('activities')
+                .select('*')
+                .order('date', { ascending: false });
+              if (allActivities) {
+                // Filter manually
+                const approvedActivities = allActivities.filter(a => 
+                  !a.approval_status || a.approval_status === 'approved'
+                );
+                await updateActivitiesInStore(approvedActivities);
+              }
+            }
+            return;
+          }
+
+          if (activities) {
+            await updateActivitiesInStore(activities);
+          } else {
+            // No activities found - clear all
+            const currentState = get();
+            const updatedUsers = currentState.users.map((user) => ({
+              ...user,
+              activities: [],
+            }));
+            set({
+              users: updatedUsers,
+              currentUserProfile: currentState.currentUserProfile ? {
+                ...currentState.currentUserProfile,
+                activities: [],
+              } : null,
+            });
+          }
+          
+          async function updateActivitiesInStore(activities) {
             // Load book distributions for all activities
             const activityIds = activities.map(a => a.id);
             let bookDistributionsByActivity = {};
@@ -1450,6 +1493,320 @@ export const useStore = create((set, get) => ({
       console.log('✅ Book deleted successfully');
     } catch (error) {
       console.error('Error deleting book:', error);
+      throw error;
+    }
+  },
+
+  // Load all pending activities for admin approval
+  loadPendingActivities: async () => {
+    try {
+      console.log('Loading pending activities...');
+      
+      // First, try to get all activities to check if approval_status column exists
+      const { data: allActivities, error: checkError } = await supabase
+        .from('activities')
+        .select('id, approval_status')
+        .limit(1);
+      
+      if (checkError && checkError.message?.includes('approval_status')) {
+        console.error('approval_status column does not exist. Please run the database migration:', checkError);
+        console.error('Please run: database/add_approval_status_to_activities.sql in Supabase SQL Editor');
+        return [];
+      }
+      
+      const { data: activities, error } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('approval_status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching pending activities:', error);
+        throw error;
+      }
+
+      console.log(`Found ${activities?.length || 0} pending activities`);
+      
+      // Debug: Log first activity to see structure
+      if (activities && activities.length > 0) {
+        console.log('Sample pending activity:', activities[0]);
+      }
+
+      if (!activities || activities.length === 0) {
+        console.log('No pending activities found. Checking if any activities exist...');
+        // Debug: Check if there are any activities at all
+        const { data: allActivities, count } = await supabase
+          .from('activities')
+          .select('id, approval_status', { count: 'exact' })
+          .limit(5);
+        console.log(`Total activities in database: ${count}`);
+        console.log('Sample activities:', allActivities);
+        return [];
+      }
+
+      // Get unique user IDs
+      const userIds = [...new Set(activities.map(a => a.user_id))];
+      console.log(`Found ${userIds.length} unique users with pending activities`);
+      
+      // Fetch users with email from auth_users join (same approach as initialize)
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select(`
+          id, 
+          name, 
+          photo, 
+          auth_user_id,
+          auth_users!inner(email)
+        `)
+        .in('id', userIds);
+
+      if (usersError) {
+        // Fallback: try without join
+        const { data: usersData, error: fallbackError } = await supabase
+          .from('users')
+          .select('id, name, photo, auth_user_id')
+          .in('id', userIds);
+        
+        if (fallbackError) throw fallbackError;
+        
+        // Create user map without email
+        const userMap = {};
+        const emailMap = {};
+        usersData.forEach(user => {
+          userMap[user.id] = user;
+        });
+        
+        // Load book distributions for fallback path
+        const activityIds = activities.map(a => a.id);
+        let bookDistributions = [];
+        if (activityIds.length > 0) {
+          try {
+            const { data: bdData } = await supabase
+              .from('book_distributions')
+              .select('*')
+              .in('activity_id', activityIds);
+            bookDistributions = bdData || [];
+          } catch (err) {
+            console.warn('Could not fetch book distributions:', err);
+          }
+        }
+        
+        return activities.map(activity => {
+          const user = userMap[activity.user_id];
+          const transformed = transformActivity(activity);
+          
+          // Add book distributions
+          transformed.bookDistributions = {};
+          bookDistributions
+            .filter(bd => bd.activity_id === activity.id)
+            .forEach(bd => {
+              transformed.bookDistributions[bd.book_id] = (transformed.bookDistributions[bd.book_id] || 0) + (bd.count || 0);
+            });
+
+          return {
+            ...transformed,
+            user: user ? {
+              id: user.id,
+              name: user.name,
+              email: null,
+              photo: user.photo,
+            } : null,
+          };
+        });
+      }
+
+      // Create user map with email
+      const userMap = {};
+      const emailMap = {};
+      users.forEach(user => {
+        userMap[user.id] = user;
+        // Handle email from auth_users (can be array or object)
+        let email = null;
+        if (user.auth_users) {
+          if (Array.isArray(user.auth_users) && user.auth_users.length > 0) {
+            email = user.auth_users[0].email;
+          } else if (typeof user.auth_users === 'object' && user.auth_users.email) {
+            email = user.auth_users.email;
+          }
+        }
+        emailMap[user.id] = email;
+      });
+
+      // Load book distributions
+      const activityIds = activities.map(a => a.id);
+      let bookDistributions = [];
+      if (activityIds.length > 0) {
+        try {
+          const { data: bdData } = await supabase
+            .from('book_distributions')
+            .select('*')
+            .in('activity_id', activityIds);
+          bookDistributions = bdData || [];
+        } catch (err) {
+          console.warn('Could not fetch book distributions:', err);
+        }
+      }
+
+      // Transform activities with user info and book distributions
+      const transformedActivities = activities.map(activity => {
+        const user = userMap[activity.user_id];
+        const transformed = transformActivity(activity);
+        
+        // Add book distributions
+        transformed.bookDistributions = {};
+        bookDistributions
+          .filter(bd => bd.activity_id === activity.id)
+          .forEach(bd => {
+            transformed.bookDistributions[bd.book_id] = (transformed.bookDistributions[bd.book_id] || 0) + (bd.count || 0);
+          });
+
+        return {
+          ...transformed,
+          user: user ? {
+            id: user.id,
+            name: user.name,
+            email: emailMap[user.id] || null,
+            photo: user.photo,
+          } : null,
+        };
+      });
+
+      return transformedActivities;
+    } catch (error) {
+      console.error('Error loading pending activities:', error);
+      return [];
+    }
+  },
+
+  // Approve an activity
+  approveActivity: async (activityId) => {
+    try {
+      // First, get the activity details
+      const { data: activity, error: fetchError } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('id', activityId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!activity) throw new Error('Activity not found');
+
+      // Update activity status to approved
+      const { error } = await supabase
+        .from('activities')
+        .update({ approval_status: 'approved' })
+        .eq('id', activityId);
+
+      if (error) throw error;
+
+      // After approval, update user totals by adding this activity's values
+      const state = get();
+      const user = state.users.find(u => u.id === activity.user_id);
+      
+      if (user) {
+        // Calculate new totals by adding activity values
+        const newHindiGita = user.hindiGita + (activity.hindi_gita || 0);
+        const newEnglishGita = user.englishGita + (activity.english_gita || 0);
+        const newSmallBooks = user.smallBooks + (activity.small_books || 0);
+        const newBhagavatam = (user.bhagavatam || 0) + (activity.bhagavatam || 0);
+        const newChaitanyaCharitamrita = (user.chaitanyaCharitamrita || 0) + (activity.chaitanya_charitamrita || 0);
+        const newOtherBooks = (user.otherBooks || 0) + (activity.other_books || 0);
+        const newTotalMoney = user.totalMoney + parseFloat(activity.money_received || 0);
+
+        // Update user totals in database
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            hindi_gita: newHindiGita,
+            english_gita: newEnglishGita,
+            small_books: newSmallBooks,
+            bhagavatam: newBhagavatam,
+            chaitanya_charitamrita: newChaitanyaCharitamrita,
+            other_books: newOtherBooks,
+            total_money: newTotalMoney,
+          })
+          .eq('id', activity.user_id);
+
+        if (updateError) throw updateError;
+
+        // Get book distributions for this activity
+        const { data: bookDistributions } = await supabase
+          .from('book_distributions')
+          .select('*')
+          .eq('activity_id', activityId);
+
+        // Update user's bookDistributions object
+        const updatedBookDistributions = { ...user.bookDistributions || {} };
+        if (bookDistributions) {
+          bookDistributions.forEach(bd => {
+            updatedBookDistributions[bd.book_id] = (updatedBookDistributions[bd.book_id] || 0) + (bd.count || 0);
+          });
+        }
+
+        // Update local state
+        set((state) => {
+          const updatedUsers = state.users.map((u) =>
+            u.id === activity.user_id
+              ? {
+                  ...u,
+                  hindiGita: newHindiGita,
+                  englishGita: newEnglishGita,
+                  smallBooks: newSmallBooks,
+                  bhagavatam: newBhagavatam,
+                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
+                  otherBooks: newOtherBooks,
+                  totalMoney: newTotalMoney,
+                  bookDistributions: updatedBookDistributions,
+                }
+              : u
+          );
+
+          // Update currentUserProfile if it's the same user
+          const updatedCurrentUserProfile = 
+            state.currentUserProfile?.id === activity.user_id
+              ? {
+                  ...state.currentUserProfile,
+                  hindiGita: newHindiGita,
+                  englishGita: newEnglishGita,
+                  smallBooks: newSmallBooks,
+                  bhagavatam: newBhagavatam,
+                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
+                  otherBooks: newOtherBooks,
+                  totalMoney: newTotalMoney,
+                  bookDistributions: updatedBookDistributions,
+                }
+              : state.currentUserProfile;
+
+          return {
+            users: updatedUsers,
+            currentUserProfile: updatedCurrentUserProfile,
+          };
+        });
+      }
+
+      // Reload activities to refresh the list
+      await get().loadUserActivities(activity.user_id, true);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error approving activity:', error);
+      throw error;
+    }
+  },
+
+  // Reject an activity
+  rejectActivity: async (activityId) => {
+    try {
+      const { error } = await supabase
+        .from('activities')
+        .update({ approval_status: 'rejected' })
+        .eq('id', activityId);
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error rejecting activity:', error);
       throw error;
     }
   },

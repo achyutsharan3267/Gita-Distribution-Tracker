@@ -2,14 +2,60 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { useState, useRef, useEffect } from 'react';
+import { toast } from 'react-toastify';
 
 const Layout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut, isAdmin } = useAuth();
   const currentUserProfile = useStore((state) => state.currentUserProfile);
+  const loadPendingActivities = useStore((state) => state.loadPendingActivities);
+  const loadUserActivities = useStore((state) => state.loadUserActivities);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [adminNotifications, setAdminNotifications] = useState([]);
+  const [userNotifications, setUserNotifications] = useState([]);
   const menuRef = useRef(null);
+  const notificationRef = useRef(null);
+
+  // Load seen notification IDs from localStorage
+  const getSeenNotificationIds = () => {
+    try {
+      const stored = localStorage.getItem('seenNotificationIds');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch (error) {
+      return new Set();
+    }
+  };
+
+  // Save seen notification IDs to localStorage
+  const saveSeenNotificationIds = (ids) => {
+    try {
+      localStorage.setItem('seenNotificationIds', JSON.stringify(Array.from(ids)));
+    } catch (error) {
+      console.error('Error saving seen notifications:', error);
+    }
+  };
+
+  // Load seen pending notification IDs from localStorage
+  const getSeenPendingIds = () => {
+    try {
+      const stored = localStorage.getItem('seenPendingIds');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch (error) {
+      return new Set();
+    }
+  };
+
+  // Save seen pending notification IDs to localStorage
+  const saveSeenPendingIds = (ids) => {
+    try {
+      localStorage.setItem('seenPendingIds', JSON.stringify(Array.from(ids)));
+    } catch (error) {
+      console.error('Error saving seen pending notifications:', error);
+    }
+  };
 
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠' },
@@ -24,16 +70,216 @@ const Layout = ({ children }) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowUserMenu(false);
       }
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
     };
 
-    if (showUserMenu) {
+    if (showUserMenu || showNotifications) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showUserMenu]);
+  }, [showUserMenu, showNotifications]);
+
+  // Load pending activities count and notifications for admin
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    const loadPendingCount = async () => {
+      try {
+        const activities = await loadPendingActivities();
+        const count = activities?.length || 0;
+        setPendingCount(count);
+        
+        if (activities && activities.length > 0) {
+          // Get seen pending IDs from localStorage
+          const seenPendingIds = getSeenPendingIds();
+          
+          // Create notifications for ALL pending activities (so admin can see them in dropdown)
+          const allNotifications = activities.map(a => ({
+            id: `pending-${a.id}`,
+            activityId: a.id,
+            message: `${a.user?.name || 'A user'} submitted a new activity for ${new Date(a.date).toLocaleDateString()}`,
+            date: a.date,
+            userName: a.user?.name || 'Unknown',
+            type: 'pending'
+          }));
+          
+          // Update notifications list (avoid duplicates)
+          setAdminNotifications(prev => {
+            const existingIds = new Set(prev.map(n => n.activityId));
+            const uniqueNew = allNotifications.filter(n => !existingIds.has(n.activityId));
+            const updated = [...uniqueNew, ...prev];
+            // Keep only notifications for activities that still exist
+            const currentActivityIds = new Set(activities.map(a => a.id));
+            return updated.filter(n => currentActivityIds.has(n.activityId)).slice(0, 20);
+          });
+          
+          // Check for truly new pending activities (not yet seen) for toast
+          const newPending = activities.filter(a => {
+            return !seenPendingIds.has(a.id);
+          });
+          
+          if (newPending.length > 0) {
+            // Mark these as seen and save to localStorage
+            const updatedSeenIds = new Set(seenPendingIds);
+            newPending.forEach(a => updatedSeenIds.add(a.id));
+            saveSeenPendingIds(updatedSeenIds);
+            
+            // Show toast for new pending activities
+            if (newPending.length === 1) {
+              toast.info(`⏳ ${newPending[0].user?.name || 'A user'} submitted a new activity for approval`, {
+                position: "top-right",
+                autoClose: 5000,
+              });
+            } else {
+              toast.info(`⏳ ${newPending.length} new activities pending approval`, {
+                position: "top-right",
+                autoClose: 5000,
+              });
+            }
+          }
+        } else {
+          // No pending activities - clear notifications
+          setAdminNotifications([]);
+        }
+      } catch (error) {
+        console.error('Error loading pending count:', error);
+      }
+    };
+
+    loadPendingCount();
+    // Refresh every 10 seconds
+    const interval = setInterval(loadPendingCount, 10000);
+    return () => clearInterval(interval);
+  }, [user, isAdmin, loadPendingActivities]);
+
+  // Check for approved and rejected activities for user
+  useEffect(() => {
+    if (!user || !currentUserProfile || isAdmin) return;
+
+    const checkActivities = async () => {
+      try {
+        const activities = await loadUserActivities(currentUserProfile.id, false, true);
+        const approvedActivities = activities.filter(a => a.approvalStatus === 'approved');
+        const rejectedActivities = activities.filter(a => a.approvalStatus === 'rejected');
+        
+        // Get seen notification IDs from localStorage
+        const seenActivityIds = getSeenNotificationIds();
+        
+        // Check for truly new approved activities (not yet seen)
+        const newApproved = approvedActivities.filter(a => {
+          return !seenActivityIds.has(`approved-${a.id}`);
+        });
+        
+        // Check for truly new rejected activities (not yet seen)
+        const newRejected = rejectedActivities.filter(a => {
+          return !seenActivityIds.has(`rejected-${a.id}`);
+        });
+        
+        // Handle new approved activities
+        if (newApproved.length > 0) {
+          // Mark these as seen and save to localStorage
+          const updatedSeenIds = new Set(seenActivityIds);
+          newApproved.forEach(a => updatedSeenIds.add(`approved-${a.id}`));
+          saveSeenNotificationIds(updatedSeenIds);
+          
+          // Show toast only once for new approvals
+          if (newApproved.length === 1) {
+            const totalBooks = newApproved[0].bookDistributions ? 
+              Object.values(newApproved[0].bookDistributions).reduce((sum, count) => sum + (count || 0), 0) :
+              (newApproved[0].hindiGita || 0) + (newApproved[0].englishGita || 0) + (newApproved[0].smallBooks || 0);
+            
+            toast.success(`✅ Your activity from ${new Date(newApproved[0].date).toLocaleDateString()} has been approved! (${totalBooks} books)`, {
+              position: "top-right",
+              autoClose: 5000,
+            });
+          } else {
+            toast.success(`✅ ${newApproved.length} activities approved! Check your profile.`, {
+              position: "top-right",
+              autoClose: 5000,
+            });
+          }
+          
+          // Add new notifications (avoid duplicates)
+          const newNotifications = newApproved.map(a => {
+            const totalBooks = a.bookDistributions ? 
+              Object.values(a.bookDistributions).reduce((sum, count) => sum + (count || 0), 0) :
+              (a.hindiGita || 0) + (a.englishGita || 0) + (a.smallBooks || 0);
+            
+            return {
+              id: `approved-${a.id}`,
+              activityId: a.id,
+              message: `✅ Your activity from ${new Date(a.date).toLocaleDateString()} has been approved! (${totalBooks} books)`,
+              date: a.date,
+              type: 'approved'
+            };
+          });
+          
+          setUserNotifications(prev => {
+            // Avoid duplicates
+            const existingIds = new Set(prev.map(n => n.activityId));
+            const uniqueNew = newNotifications.filter(n => !existingIds.has(n.activityId));
+            return [...uniqueNew, ...prev].slice(0, 20); // Keep last 20 notifications
+          });
+        }
+        
+        // Handle new rejected activities
+        if (newRejected.length > 0) {
+          // Mark these as seen and save to localStorage
+          const updatedSeenIds = new Set(seenActivityIds);
+          newRejected.forEach(a => updatedSeenIds.add(`rejected-${a.id}`));
+          saveSeenNotificationIds(updatedSeenIds);
+          
+          // Show toast for rejected activities
+          if (newRejected.length === 1) {
+            toast.error(`❌ Your activity from ${new Date(newRejected[0].date).toLocaleDateString()} has been rejected. Please check and resubmit.`, {
+              position: "top-right",
+              autoClose: 6000,
+            });
+          } else {
+            toast.error(`❌ ${newRejected.length} activities rejected. Please check your profile.`, {
+              position: "top-right",
+              autoClose: 6000,
+            });
+          }
+          
+          // Add new rejected notifications (avoid duplicates)
+          const newRejectedNotifications = newRejected.map(a => {
+            const totalBooks = a.bookDistributions ? 
+              Object.values(a.bookDistributions).reduce((sum, count) => sum + (count || 0), 0) :
+              (a.hindiGita || 0) + (a.englishGita || 0) + (a.smallBooks || 0);
+            
+            return {
+              id: `rejected-${a.id}`,
+              activityId: a.id,
+              message: `❌ Your activity from ${new Date(a.date).toLocaleDateString()} has been rejected. Please check and resubmit. (${totalBooks} books)`,
+              date: a.date,
+              type: 'rejected'
+            };
+          });
+          
+          setUserNotifications(prev => {
+            // Avoid duplicates
+            const existingIds = new Set(prev.map(n => n.activityId));
+            const uniqueNew = newRejectedNotifications.filter(n => !existingIds.has(n.activityId));
+            return [...uniqueNew, ...prev].slice(0, 20); // Keep last 20 notifications
+          });
+        }
+      } catch (error) {
+        console.error('Error checking activities:', error);
+      }
+    };
+
+    // Initial load - don't show notifications for old activities
+    checkActivities();
+    // Check every 15 seconds for new approvals/rejections
+    const interval = setInterval(checkActivities, 15000);
+    return () => clearInterval(interval);
+  }, [user, currentUserProfile, isAdmin, loadUserActivities]);
 
   const handleLogout = async () => {
     await signOut();
@@ -57,7 +303,184 @@ const Layout = ({ children }) => {
             </div>
             <div className="flex items-center space-x-3 flex-shrink-0">
               {user ? (
-                <div className="relative" ref={menuRef}>
+                <>
+                  {/* Notification Bell Icon */}
+                  <div className="relative" ref={notificationRef}>
+                    <button
+                      onClick={() => {
+                        setShowNotifications(!showNotifications);
+                        setShowUserMenu(false);
+                        // Mark all current notifications as seen when opening dropdown
+                        if (!showNotifications) {
+                          if (isAdmin && adminNotifications.length > 0) {
+                            const seenIds = getSeenPendingIds();
+                            adminNotifications.forEach(n => {
+                              if (n.activityId) seenIds.add(n.activityId);
+                            });
+                            saveSeenPendingIds(seenIds);
+                          } else if (!isAdmin && userNotifications.length > 0) {
+                            const seenIds = getSeenNotificationIds();
+                            userNotifications.forEach(n => {
+                              if (n.activityId) seenIds.add(n.activityId);
+                            });
+                            saveSeenNotificationIds(seenIds);
+                          }
+                        }
+                      }}
+                      className="relative p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      title={isAdmin ? `${pendingCount} pending approvals` : `${userNotifications.length} notifications`}
+                    >
+                      <svg
+                        className="w-6 h-6 text-gray-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                        />
+                      </svg>
+                      {(() => {
+                        if (isAdmin) {
+                          // Show pending count badge
+                          return pendingCount > 0 ? (
+                            <span className="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                              {pendingCount}
+                            </span>
+                          ) : null;
+                        } else {
+                          // Count only unseen approved activities
+                          const seenIds = getSeenNotificationIds();
+                          const unseenCount = userNotifications.filter(n => !seenIds.has(n.activityId)).length;
+                          return unseenCount > 0 ? (
+                            <span className="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                              {unseenCount}
+                            </span>
+                          ) : null;
+                        }
+                      })()}
+                    </button>
+
+                    {/* Notifications Dropdown - For Admin */}
+                    {isAdmin && showNotifications && (
+                      <>
+                        <div 
+                          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
+                          onClick={() => setShowNotifications(false)}
+                        />
+                        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-50 max-h-96 overflow-y-auto">
+                          <div className="px-4 py-3 border-b border-gray-200 bg-white rounded-t-2xl flex items-center justify-between">
+                            <p className="text-sm font-semibold text-gray-900">Pending Approvals</p>
+                            <button
+                              onClick={async () => {
+                                navigate('/admin');
+                                setShowNotifications(false);
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              View All →
+                            </button>
+                          </div>
+                          <div className="py-1 bg-white">
+                            {adminNotifications.length > 0 ? (
+                              adminNotifications.map((notification) => (
+                                <div
+                                  key={notification.id}
+                                  className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 cursor-pointer"
+                                  onClick={async () => {
+                                    navigate('/admin');
+                                    setShowNotifications(false);
+                                  }}
+                                >
+                                  <p className="text-sm text-gray-900">{notification.message}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {new Date(notification.date).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              ))
+                            ) : pendingCount > 0 ? (
+                              <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                Loading notifications...
+                              </div>
+                            ) : (
+                              <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                No pending approvals
+                              </div>
+                            )}
+                          </div>
+                          {adminNotifications.length > 0 && (
+                            <div className="border-t border-gray-200 py-2 bg-white rounded-b-2xl">
+                              <button
+                                onClick={() => {
+                                  // Mark all as seen
+                                  const seenIds = getSeenPendingIds();
+                                  adminNotifications.forEach(n => {
+                                    if (n.activityId) seenIds.add(n.activityId);
+                                  });
+                                  saveSeenPendingIds(seenIds);
+                                  setAdminNotifications([]);
+                                  setShowNotifications(false);
+                                }}
+                                className="w-full text-center text-xs text-gray-600 hover:text-gray-900 py-2"
+                              >
+                                Mark all as seen
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Notifications Dropdown - For Users */}
+                    {!isAdmin && showNotifications && userNotifications.length > 0 && (
+                      <>
+                        <div 
+                          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
+                          onClick={() => setShowNotifications(false)}
+                        />
+                        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-50 max-h-96 overflow-y-auto">
+                          <div className="px-4 py-3 border-b border-gray-200 bg-white rounded-t-2xl">
+                            <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                          </div>
+                          <div className="py-1 bg-white">
+                            {userNotifications.map((notification) => (
+                              <div
+                                key={notification.id}
+                                className={`px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                                  notification.type === 'rejected' ? 'bg-red-50' : ''
+                                }`}
+                              >
+                                <p className={`text-sm ${
+                                  notification.type === 'rejected' ? 'text-red-900' : 'text-gray-900'
+                                }`}>
+                                  {notification.message}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {new Date(notification.date).toLocaleDateString()}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t border-gray-200 py-2 bg-white rounded-b-2xl">
+                            <button
+                              onClick={() => {
+                                setUserNotifications([]);
+                                setShowNotifications(false);
+                              }}
+                              className="w-full text-center text-xs text-gray-600 hover:text-gray-900 py-2"
+                            >
+                              Clear all
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="relative" ref={menuRef}>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -154,7 +577,8 @@ const Layout = ({ children }) => {
                     </div>
                     </>
                   )}
-                </div>
+                  </div>
+                </>
               ) : (
                 <div className="flex items-center space-x-1 sm:space-x-2">
                   <Link

@@ -17,6 +17,9 @@ const AdminDashboard = () => {
   const deleteActivity = useStore((state) => state.deleteActivity);
   const updateActivity = useStore((state) => state.updateActivity);
   const loadUserActivities = useStore((state) => state.loadUserActivities);
+  const loadPendingActivities = useStore((state) => state.loadPendingActivities);
+  const approveActivity = useStore((state) => state.approveActivity);
+  const rejectActivity = useStore((state) => state.rejectActivity);
   const books = useStore((state) => state.books);
   const loadBooks = useStore((state) => state.loadBooks);
   const addBook = useStore((state) => state.addBook);
@@ -35,7 +38,8 @@ const AdminDashboard = () => {
   const [editActivityData, setEditActivityData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings'
+  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings', 'approvals'
+  const [pendingActivities, setPendingActivities] = useState([]);
   
   // Books management state
   const [showAddBookModal, setShowAddBookModal] = useState(false);
@@ -46,6 +50,127 @@ const AdminDashboard = () => {
     price: '',
     description: '',
   });
+  const [selectedBookTemplate, setSelectedBookTemplate] = useState('');
+
+  // Predefined book templates (without years)
+  const bookTemplates = [
+    {
+      name: 'Bhagavad-gita As It Is',
+      description: "Krishna's teachings to Arjuna on duty, devotion and the nature of the soul, explained with clear commentary."
+    },
+    {
+      name: 'Srimad-Bhagavatam',
+      description: 'A detailed scripture on bhakti, creation, avatars of Krishna and lives of great devotees.'
+    },
+    {
+      name: 'Sri Caitanya-caritamrta',
+      description: "The life and teachings of Sri Chaitanya Mahaprabhu, focusing on pure love of Krishna."
+    },
+    {
+      name: 'Teachings of Lord Caitanya',
+      description: "A simplified presentation of Chaitanya Mahaprabhu's philosophy and the process of chanting."
+    },
+    {
+      name: 'The Nectar of Devotion',
+      description: "A practical guide to bhakti-yoga based on Rupa Goswami's Bhakti-rasamrita-sindhu."
+    },
+    {
+      name: 'The Nectar of Instruction',
+      description: 'Short verses giving essential guidance for spiritual discipline and steady bhakti.'
+    },
+    {
+      name: 'Easy Journey to Other Planets',
+      description: 'Explains higher planetary systems and why spiritual advancement surpasses material travel.'
+    },
+    {
+      name: 'Krsna Consciousness: The Topmost Yoga System',
+      description: 'Shows how devotional service is the highest form of yoga.'
+    },
+    {
+      name: 'KRSNA, The Supreme Personality of Godhead',
+      description: "A narrative of Krishna's pastimes in Vrindavan and Mathura, written in story form."
+    },
+    {
+      name: 'Perfect Questions, Perfect Answers',
+      description: 'A conversation on the soul, God, and spiritual life between Srila Prabhupada and Bob Cohen.'
+    },
+    {
+      name: 'Teachings of Lord Kapila, the Son of Devahuti',
+      description: 'Explains Sankhya philosophy and the path of devotion taught by Lord Kapila.'
+    },
+    {
+      name: 'Teachings of Queen Kunti',
+      description: "Queen Kunti's heartfelt prayers and Prabhupada's commentary on humility and devotion."
+    },
+    {
+      name: 'Krsna, the Reservoir of Pleasure',
+      description: 'Short essays describing Krishna as the source of spiritual happiness.'
+    },
+    {
+      name: 'The Science of Self Realization',
+      description: 'Articles and talks on the soul, karma, yoga, and modern life from a spiritual perspective.'
+    },
+    {
+      name: 'The Path of Perfection',
+      description: 'Explains yoga practices, self-control and spiritual progress.'
+    },
+    {
+      name: 'Life Comes From Life',
+      description: "Discussions challenging materialistic views of life's origin and supporting the spiritual perspective."
+    },
+    {
+      name: 'The Perfection of Yoga',
+      description: 'Shows how bhakti-yoga leads to the highest spiritual goal.'
+    },
+    {
+      name: 'Beyond Birth and Death',
+      description: 'Explains reincarnation, karma and how to escape the cycle of birth and death.'
+    },
+    {
+      name: 'On the Way to Krsna',
+      description: 'Guidance on connecting daily life with Krishna consciousness.'
+    },
+    {
+      name: 'Raja-Vidya: The King of Knowledge',
+      description: "A clear explanation of the Gita's teachings on the soul and God."
+    },
+    {
+      name: 'Elevation to Krsna Consciousness',
+      description: 'Talks on overcoming material habits and rising to spiritual awareness.'
+    },
+    {
+      name: 'Krsna Consciousness, The Matchless Gift',
+      description: 'Introduces the value of bhakti and the chanting of the holy name.'
+    },
+    {
+      name: 'Light of the Bhagavata',
+      description: "Poetic reflections on nature, time and Krishna's presence in the world."
+    },
+    {
+      name: 'Sri Isopanisad',
+      description: 'A concise Upanishad explaining God, the soul and how to live with spiritual vision.'
+    },
+    {
+      name: 'The Journey of Self-Discovery',
+      description: 'Essays on understanding the soul and finding real fulfillment.'
+    },
+    {
+      name: 'Transcendental Teachings of Prahlada Maharaja',
+      description: 'Lessons on devotion, fearlessness and faith from the story of Prahlada.'
+    },
+    {
+      name: 'A Second Chance: The Story of a Near-Death Experience',
+      description: 'Explores karma, death and rebirth through the story of Ajamila.'
+    },
+    {
+      name: 'Mukunda-mala-stotra',
+      description: 'Devotional prayers glorifying Krishna written by King Kulasekhara.'
+    },
+    {
+      name: 'Narada-bhakti-sutra',
+      description: 'Short teachings by Narada Muni on pure devotion and love for God.'
+    }
+  ];
 
   // Generate 12-character Book ID using a-z, A-Z, 0-9 and hyphens
   // Example: aakd-2802-jkss
@@ -72,6 +197,28 @@ const AdminDashboard = () => {
   useEffect(() => {
     loadBooks();
   }, [loadBooks]);
+
+  // Load pending activities when component mounts and when approvals section is active
+  useEffect(() => {
+    const loadPending = async () => {
+      try {
+        console.log('AdminDashboard: Loading pending activities...');
+        const activities = await loadPendingActivities();
+        console.log('AdminDashboard: Loaded activities:', activities);
+        setPendingActivities(activities || []);
+      } catch (error) {
+        console.error('Error loading pending activities:', error);
+        toast.error('Failed to load pending activities: ' + error.message);
+      }
+    };
+    
+    loadPending();
+    // Refresh every 10 seconds when approvals section is active
+    if (activeSection === 'approvals') {
+      const interval = setInterval(loadPending, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [loadPendingActivities, activeSection]);
 
   // Handle add book
   const handleAddBook = async () => {
@@ -300,7 +447,7 @@ const AdminDashboard = () => {
     setShowActivitiesModal(true);
     // Ensure activities are loaded
     try {
-      await loadUserActivities(user.id);
+      await loadUserActivities(user.id, true); // Admin can see all activities including pending
       // Refresh user from store
       const updatedUser = users.find(u => u.id === user.id);
       if (updatedUser) {
@@ -423,6 +570,32 @@ const AdminDashboard = () => {
           <h3 className="text-xl font-bold text-gray-800 mb-2">Manage Users</h3>
           <p className="text-sm text-gray-600 mb-4">
             View, edit, delete users and manage their profiles
+          </p>
+          <div className="flex items-center text-spiritual-600 font-medium text-sm">
+            <span>View Details</span>
+            <span className="ml-2">→</span>
+          </div>
+        </div>
+
+        {/* Pending Approvals Tile */}
+        <div
+          onClick={() => setActiveSection('approvals')}
+          className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+            activeSection === 'approvals' ? 'ring-2 ring-spiritual-500 ring-offset-2' : ''
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-lg flex items-center justify-center text-3xl">
+              ⏳
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">{pendingActivities.length}</p>
+              <p className="text-xs text-gray-500">Pending</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Pending Approvals</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Review and approve activity submissions
           </p>
           <div className="flex items-center text-spiritual-600 font-medium text-sm">
             <span>View Details</span>
@@ -718,6 +891,217 @@ const AdminDashboard = () => {
       )}
 
       {/* Settings Section */}
+      {/* Pending Approvals Section */}
+      {activeSection === 'approvals' && (
+      <div className="card p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">⏳ Pending Activity Approvals</h2>
+          <button
+            onClick={async () => {
+              try {
+                const activities = await loadPendingActivities();
+                setPendingActivities(activities || []);
+                toast.success('Refreshed pending activities');
+              } catch (error) {
+                toast.error('Failed to refresh: ' + error.message);
+              }
+            }}
+            className="btn-secondary text-sm"
+          >
+            🔄 Refresh
+          </button>
+        </div>
+        
+        {pendingActivities.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-lg">No pending activities</p>
+            <p className="text-gray-500 text-sm mt-2">
+              All activities have been reviewed
+            </p>
+            <p className="text-xs text-gray-400 mt-4 px-4">
+              Note: Make sure database migration has been run (add_approval_status_to_activities.sql)
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {pendingActivities.map((activity) => {
+              const totalBooks = books.reduce((sum, book) => {
+                const bookId = book.id || book.bookId;
+                return sum + (activity.bookDistributions?.[bookId] || getActivityBookValue(activity, bookId) || 0);
+              }, 0);
+
+              // Calculate Amount as per Books
+              let amountAsPerBooks = 0;
+              books.forEach(book => {
+                const bookId = book.id || book.bookId;
+                const count = activity.bookDistributions?.[bookId] || getActivityBookValue(activity, bookId) || 0;
+                const price = parseFloat(book.price || 0);
+                amountAsPerBooks += count * price;
+              });
+
+              const onlineAmount = activity.moneyOnline || 0;
+              const offlineAmount = activity.moneyOffline || 0;
+              const totalReceivedAmount = onlineAmount + offlineAmount;
+              const insufficientFunds = amountAsPerBooks > totalReceivedAmount 
+                ? amountAsPerBooks - totalReceivedAmount 
+                : 0;
+              const donationAmount = totalReceivedAmount > amountAsPerBooks 
+                ? totalReceivedAmount - amountAsPerBooks 
+                : 0;
+
+              return (
+                <div key={activity.id} className="border-2 border-yellow-300 rounded-xl p-4 sm:p-6 bg-yellow-50 hover:bg-yellow-100 transition-colors">
+                  {/* User Info Header */}
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-yellow-200">
+                    <img
+                      src={activity.user?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.user?.name || 'User')}&background=a855f7&color=fff&size=128`}
+                      alt={activity.user?.name}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-base sm:text-lg">{activity.user?.name}</p>
+                      <p className="text-xs sm:text-sm text-gray-600">{activity.user?.email}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        📅 {new Date(activity.date).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </p>
+                    </div>
+                    <span className="bg-yellow-200 text-yellow-900 px-3 py-1 rounded-full text-xs font-semibold">
+                      ⏳ Pending
+                    </span>
+                  </div>
+
+                  {/* Books Distribution Details */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-800 mb-2">📚 Books Distributed:</h4>
+                    <div className={`grid gap-2 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+                      {books.map((book) => {
+                        const bookId = book.id || book.bookId;
+                        const count = activity.bookDistributions?.[bookId] || getActivityBookValue(activity, bookId) || 0;
+                        if (count === 0) return null;
+                        return (
+                          <div key={bookId} className="bg-white rounded-lg p-2 sm:p-3 border border-yellow-200">
+                            <p className="text-xs text-gray-600 mb-1 break-words line-clamp-2">{book.name}</p>
+                            <p className="text-sm sm:text-base font-bold text-gray-900">{count}</p>
+                            <p className="text-xs text-gray-500">₹{book.price} each</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {totalBooks === 0 && (
+                      <p className="text-sm text-gray-500 italic">No books distributed in this activity</p>
+                    )}
+                    <div className="mt-2 pt-2 border-t border-yellow-200">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Total Books: <span className="text-base">{totalBooks}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Money Details */}
+                  {totalReceivedAmount > 0 && (
+                    <div className="mb-4 p-3 bg-white rounded-lg border border-yellow-200">
+                      <h4 className="text-sm font-semibold text-gray-800 mb-2">💰 Money Details:</h4>
+                      <div className="space-y-2 text-xs sm:text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Money Paid Online:</span>
+                          <span className="font-semibold text-gray-900">₹{onlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Money Paid Offline:</span>
+                          <span className="font-semibold text-gray-900">₹{offlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                          <span className="font-medium text-gray-700">Total Money Received:</span>
+                          <span className="font-bold text-gray-900">₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Amount as per Books:</span>
+                          <span className="font-semibold text-gray-900">₹{amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        {insufficientFunds > 0 && (
+                          <div className="flex justify-between items-center pt-2 border-t border-red-200 bg-red-50 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
+                            <span className="font-medium text-red-700">⚠️ Insufficient Funds:</span>
+                            <span className="font-bold text-red-700">₹{insufficientFunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                        {donationAmount > 0 && (
+                          <div className="flex justify-between items-center pt-2 border-t border-green-200 bg-green-50 -mx-3 -mb-3 px-3 py-2 rounded-b-lg">
+                            <span className="font-medium text-green-700">💚 Donation Amount:</span>
+                            <span className="font-bold text-green-700">₹{donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-yellow-200">
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                          // Ensure we stay on approvals section
+                          setActiveSection('approvals');
+                          await approveActivity(activity.id);
+                          toast.success('Activity approved successfully');
+                          // Reload pending activities
+                          const updatedActivities = await loadPendingActivities();
+                          setPendingActivities(updatedActivities || []);
+                          // Refresh store without navigation
+                          const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
+                          if (currentAuthUser) {
+                            await useStore.getState().initialize(currentAuthUser);
+                          } else {
+                            await useStore.getState().initialize();
+                          }
+                          // Ensure we stay on approvals section after refresh
+                          setActiveSection('approvals');
+                        } catch (error) {
+                          toast.error('Failed to approve activity: ' + error.message);
+                        }
+                      }}
+                      className="btn-primary flex-1 text-sm sm:text-base px-4 py-2.5"
+                    >
+                      ✅ Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                          // Ensure we stay on approvals section
+                          setActiveSection('approvals');
+                          await rejectActivity(activity.id);
+                          toast.success('Activity rejected');
+                          // Reload pending activities
+                          const updatedActivities = await loadPendingActivities();
+                          setPendingActivities(updatedActivities || []);
+                          // Ensure we stay on approvals section after refresh
+                          setActiveSection('approvals');
+                        } catch (error) {
+                          toast.error('Failed to reject activity: ' + error.message);
+                        }
+                      }}
+                      className="btn-secondary flex-1 text-sm sm:text-base px-4 py-2.5 bg-red-50 text-red-700 hover:bg-red-100 border-red-300"
+                    >
+                      ❌ Reject
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      )}
+
       {activeSection === 'settings' && (
       <div className="card p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">⚙️ System Settings</h2>
@@ -1153,6 +1537,41 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Add New Book</h3>
             <div className="space-y-4">
+              {/* Book Template Dropdown */}
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                  Select Book Template (Optional)
+                </label>
+                <select
+                  value={selectedBookTemplate}
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    setSelectedBookTemplate(selected);
+                    if (selected) {
+                      const template = bookTemplates.find(b => b.name === selected);
+                      if (template) {
+                        setNewBook({
+                          ...newBook,
+                          name: template.name,
+                          description: template.description,
+                        });
+                      }
+                    }
+                  }}
+                  className="input-field text-sm sm:text-base"
+                >
+                  <option value="">-- Select a book to auto-fill --</option>
+                  {bookTemplates.map((book, index) => (
+                    <option key={index} value={book.name}>
+                      {book.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Select a book to auto-fill name and description
+                </p>
+              </div>
+
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                   Book Name <span className="text-red-500">*</span>
@@ -1185,16 +1604,16 @@ const AdminDashboard = () => {
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                   Description
                 </label>
-                <input
-                  type="text"
+                <textarea
                   value={newBook.description}
                   onChange={(e) => setNewBook({ ...newBook, description: e.target.value })}
-                  className="input-field text-sm sm:text-base"
+                  className="input-field text-sm sm:text-base min-h-[80px] resize-y"
                   placeholder="Brief description of the book"
+                  rows="3"
                 />
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-xs text-blue-700">
+                <p className="text-xs sm:text-sm text-blue-800">
                   <strong>Note:</strong> Book ID will be auto-generated (12 characters using a-z, A-Z, 0-9 and hyphens)
                   <br />
                   <span className="text-blue-600">Example: aakd-2802-jkss</span>
@@ -1216,6 +1635,7 @@ const AdminDashboard = () => {
                     price: '',
                     description: '',
                   });
+                  setSelectedBookTemplate('');
                 }}
                 className="btn-secondary flex-1 text-sm sm:text-base"
               >

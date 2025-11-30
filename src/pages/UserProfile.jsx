@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useAuth } from '../contexts/AuthContext';
 import { formatMobileNumber } from '../utils/maskMobileNumber';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getBookValue, getActivityBookValue, mapBookIdToUserProperty } from '../utils/bookMapping';
 
 const UserProfile = () => {
@@ -15,6 +15,12 @@ const UserProfile = () => {
   const loadBooks = useStore((state) => state.loadBooks);
   const loadUserActivities = useStore((state) => state.loadUserActivities);
   const user = users.find((u) => u.id === userId);
+  
+  // Check if viewing own profile
+  const isOwnProfile = currentUserProfile && currentUserProfile.id === userId;
+  
+  // Accordion state for rejected activities
+  const [isRejectedExpanded, setIsRejectedExpanded] = useState(false);
 
   // Load books on mount
   useEffect(() => {
@@ -22,9 +28,12 @@ const UserProfile = () => {
   }, [loadBooks]);
 
   // Reload activities when user changes or component mounts to get latest book distributions
+  // For own profile OR admin viewing, show all statuses (pending, approved, rejected)
   useEffect(() => {
     if (user?.id) {
-      loadUserActivities(user.id).then(activities => {
+      // Admin can see all activities, or user viewing their own profile
+      const showAllStatuses = isAdmin || isOwnProfile;
+      loadUserActivities(user.id, isAdmin, showAllStatuses).then(activities => {
         // Update user's activities in store
         const store = useStore.getState();
         useStore.setState({
@@ -36,10 +45,7 @@ const UserProfile = () => {
         console.warn('Could not reload activities:', err);
       });
     }
-  }, [user?.id, loadUserActivities]);
-  
-  // Check if viewing own profile
-  const isOwnProfile = currentUserProfile && currentUserProfile.id === userId;
+  }, [user?.id, loadUserActivities, isAdmin, isOwnProfile]);
   
   const handleSubmitDistribution = () => {
     console.log('Submit Distribution button clicked');
@@ -61,11 +67,27 @@ const UserProfile = () => {
     const bookId = book.id || book.bookId;
     return sum + getBookValue(user, bookId);
   }, 0);
-  const sortedActivities = [...user.activities].sort(
+  
+  // Separate approved, pending, and rejected activities
+  // Admin can see all activities, regular users only see approved (except their own)
+  const approvedActivities = user.activities.filter(a => a.approvalStatus === 'approved' || !a.approvalStatus);
+  const pendingActivities = user.activities.filter(a => a.approvalStatus === 'pending');
+  const rejectedActivities = user.activities.filter(a => a.approvalStatus === 'rejected');
+  
+  // Admin or own profile can see all activities
+  const canViewAllActivities = isAdmin || isOwnProfile;
+  
+  const sortedActivities = [...approvedActivities].sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
+  );
+  const sortedPendingActivities = [...pendingActivities].sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
+  );
+  const sortedRejectedActivities = [...rejectedActivities].sort(
     (a, b) => new Date(b.date) - new Date(a.date)
   );
 
-  // Group activities by date and merge into single entry per date
+  // Group approved activities by date and merge into single entry per date
   const activitiesByDate = sortedActivities.reduce((acc, activity) => {
     const dateKey = activity.date;
     if (!acc[dateKey]) {
@@ -77,6 +99,7 @@ const UserProfile = () => {
         entryCount: 0,
         activityIds: [],
         bookValues: {}, // Store book values by bookId (works for both standard and new books)
+        approvalStatuses: [], // Track all approval statuses for this date
       };
     }
     // Add book values dynamically using bookId directly
@@ -92,11 +115,33 @@ const UserProfile = () => {
     acc[dateKey].moneyOffline += activity.moneyOffline || 0;
     acc[dateKey].entryCount += 1;
     acc[dateKey].activityIds.push(activity.id);
+    // Track approval status
+    const status = activity.approvalStatus || 'approved';
+    if (!acc[dateKey].approvalStatuses.includes(status)) {
+      acc[dateKey].approvalStatuses.push(status);
+    }
     return acc;
   }, {});
 
   // Convert to array and sort by date (newest first)
   const mergedActivities = Object.values(activitiesByDate).sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
+  );
+  
+  // Group pending activities by date (but keep them separate, don't merge with approved)
+  const pendingActivitiesByDate = sortedPendingActivities.reduce((acc, activity) => {
+    const dateKey = activity.date;
+    if (!acc[dateKey]) {
+      acc[dateKey] = {
+        date: dateKey,
+        activities: [],
+      };
+    }
+    acc[dateKey].activities.push(activity);
+    return acc;
+  }, {});
+  
+  const groupedPendingActivities = Object.values(pendingActivitiesByDate).sort(
     (a, b) => new Date(b.date) - new Date(a.date)
   );
 
@@ -254,6 +299,11 @@ const UserProfile = () => {
               ➕ Add
             </button>
           )}
+          {isAdmin && !isOwnProfile && (
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              Admin View
+            </span>
+          )}
         </div>
 
         {sortedActivities.length === 0 ? (
@@ -284,9 +334,17 @@ const UserProfile = () => {
                 >
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm sm:text-base break-words">
-                        {formatDate(mergedActivity.date)}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-900 text-sm sm:text-base break-words">
+                          {formatDate(mergedActivity.date)}
+                        </p>
+                        {/* Approval Status Badge */}
+                        {canViewAllActivities && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            ✅ Approved
+                          </span>
+                        )}
+                      </div>
                       {hasMultipleEntries && (
                         <p className="text-xs text-gray-500 mt-1">
                           {mergedActivity.entryCount} entries merged
@@ -410,6 +468,282 @@ const UserProfile = () => {
           </div>
         )}
       </div>
+
+      {/* Pending Activities Section - For own profile or admin viewing */}
+      {canViewAllActivities && sortedPendingActivities.length > 0 && (
+        <div className="card p-5 border-2 border-yellow-200 bg-yellow-50">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+              <span className="mr-2">⏳</span>
+              Pending Activities
+            </h2>
+            <span className="text-xs font-medium text-yellow-800 bg-yellow-200 px-2 py-1 rounded">
+              {sortedPendingActivities.length} {sortedPendingActivities.length === 1 ? 'activity' : 'activities'}
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {sortedPendingActivities.map((activity) => {
+              const totalBooks = books.reduce((sum, book) => {
+                const bookId = book.id || book.bookId;
+                return sum + getActivityBookValue(activity, bookId);
+              }, 0);
+
+              return (
+                <div
+                  key={activity.id}
+                  className="border-2 border-yellow-300 bg-white rounded-xl p-3 sm:p-4"
+                >
+                  {/* Header with Date and Status */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-900 text-sm sm:text-base">
+                          📅 {formatDate(activity.date)}
+                        </p>
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-200 text-yellow-900">
+                          ⏳ Pending Approval
+                        </span>
+                      </div>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        {isAdmin ? 'This activity is pending approval.' : 'Waiting for admin approval. Your submission will be reviewed soon.'}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right flex-shrink-0">
+                      <p className="text-base sm:text-lg font-bold text-gray-900">
+                        {totalBooks} books
+                      </p>
+                      {activity.moneyReceived > 0 && (
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          ₹{activity.moneyReceived.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Books Distribution */}
+                  <div className={`grid gap-2 mb-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+                    {books.map((book) => {
+                      const bookId = book.id || book.bookId;
+                      const value = getActivityBookValue(activity, bookId);
+                      if (value === 0) return null;
+                      return (
+                        <div key={bookId} className="rounded-xl p-2 sm:p-2.5 bg-yellow-100">
+                          <p className="text-xs text-gray-700 mb-0.5 sm:mb-1 break-words line-clamp-2">{book.name}</p>
+                          <p className="text-sm sm:text-base font-semibold text-gray-900">
+                            {value}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Money Details */}
+                  {activity.moneyReceived > 0 && (() => {
+                    // Calculate Amount as per Books
+                    let amountAsPerBooks = 0;
+                    books.forEach(book => {
+                      const bookId = book.id || book.bookId;
+                      const count = getActivityBookValue(activity, bookId);
+                      const price = parseFloat(book.price || 0);
+                      amountAsPerBooks += count * price;
+                    });
+
+                    const onlineAmount = activity.moneyOnline || 0;
+                    const offlineAmount = activity.moneyOffline || 0;
+                    const totalReceivedAmount = onlineAmount + offlineAmount;
+                    const insufficientFunds = amountAsPerBooks > totalReceivedAmount 
+                      ? amountAsPerBooks - totalReceivedAmount 
+                      : 0;
+                    const donationAmount = totalReceivedAmount > amountAsPerBooks 
+                      ? totalReceivedAmount - amountAsPerBooks 
+                      : 0;
+
+                    return (
+                      <div className="border-t border-yellow-200 pt-3 mt-3">
+                        <div className="space-y-2 text-xs sm:text-sm">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Total Money Received (₹)</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                              ₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Amount as per Books (₹)</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                              ₹{amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {insufficientFunds > 0 && (
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-red-600">Insufficient Funds (₹)</span>
+                              <span className="text-xs sm:text-sm font-semibold text-red-600">
+                                ₹{insufficientFunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
+                          {donationAmount > 0 && (
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-green-600">Donation Amount (₹)</span>
+                              <span className="text-xs sm:text-sm font-semibold text-green-600">
+                                ₹{donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Rejected Activities Section - Accordion - For own profile or admin viewing */}
+      {canViewAllActivities && sortedRejectedActivities.length > 0 && (
+        <div className="card p-0 border-2 border-red-300 bg-red-50 overflow-hidden">
+          {/* Accordion Header */}
+          <button
+            onClick={() => setIsRejectedExpanded(!isRejectedExpanded)}
+            className="w-full flex items-center justify-between p-5 hover:bg-red-100 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <span className="mr-2">❌</span>
+                Rejected Activities
+              </h2>
+              <span className="text-xs font-medium text-red-800 bg-red-200 px-2 py-1 rounded">
+                {sortedRejectedActivities.length} {sortedRejectedActivities.length === 1 ? 'activity' : 'activities'}
+              </span>
+            </div>
+            <span className={`text-red-600 transition-transform duration-200 ${isRejectedExpanded ? 'rotate-180' : ''}`}>
+              ▼
+            </span>
+          </button>
+
+          {/* Accordion Content */}
+          {isRejectedExpanded && (
+            <div className="px-5 pb-5 space-y-3 border-t border-red-200 pt-4">
+            {sortedRejectedActivities.map((activity) => {
+              const totalBooks = books.reduce((sum, book) => {
+                const bookId = book.id || book.bookId;
+                return sum + getActivityBookValue(activity, bookId);
+              }, 0);
+
+              return (
+                <div
+                  key={activity.id}
+                  className="border-2 border-red-400 bg-white rounded-xl p-3 sm:p-4"
+                >
+                  {/* Header with Date and Status */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-900 text-sm sm:text-base">
+                          📅 {formatDate(activity.date)}
+                        </p>
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-200 text-red-900">
+                          ❌ Rejected
+                        </span>
+                      </div>
+                      <p className="text-xs text-red-700 mt-1">
+                        {isAdmin ? 'This activity was rejected.' : 'This submission was rejected by admin. Please check and resubmit if needed.'}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right flex-shrink-0">
+                      <p className="text-base sm:text-lg font-bold text-gray-900">
+                        {totalBooks} books
+                      </p>
+                      {activity.moneyReceived > 0 && (
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          ₹{activity.moneyReceived.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Books Distribution */}
+                  <div className={`grid gap-2 mb-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
+                    {books.map((book) => {
+                      const bookId = book.id || book.bookId;
+                      const value = getActivityBookValue(activity, bookId);
+                      if (value === 0) return null;
+                      return (
+                        <div key={bookId} className="rounded-xl p-2 sm:p-2.5 bg-red-100">
+                          <p className="text-xs text-gray-700 mb-0.5 sm:mb-1 break-words line-clamp-2">{book.name}</p>
+                          <p className="text-sm sm:text-base font-semibold text-gray-900">
+                            {value}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Money Details */}
+                  {activity.moneyReceived > 0 && (() => {
+                    // Calculate Amount as per Books
+                    let amountAsPerBooks = 0;
+                    books.forEach(book => {
+                      const bookId = book.id || book.bookId;
+                      const count = getActivityBookValue(activity, bookId);
+                      const price = parseFloat(book.price || 0);
+                      amountAsPerBooks += count * price;
+                    });
+
+                    const onlineAmount = activity.moneyOnline || 0;
+                    const offlineAmount = activity.moneyOffline || 0;
+                    const totalReceivedAmount = onlineAmount + offlineAmount;
+                    const insufficientFunds = amountAsPerBooks > totalReceivedAmount 
+                      ? amountAsPerBooks - totalReceivedAmount 
+                      : 0;
+                    const donationAmount = totalReceivedAmount > amountAsPerBooks 
+                      ? totalReceivedAmount - amountAsPerBooks 
+                      : 0;
+
+                    return (
+                      <div className="border-t border-red-200 pt-3 mt-3">
+                        <div className="space-y-2 text-xs sm:text-sm">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Total Money Received (₹)</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                              ₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Amount as per Books (₹)</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                              ₹{amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {insufficientFunds > 0 && (
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-red-600">Insufficient Funds (₹)</span>
+                              <span className="text-xs sm:text-sm font-semibold text-red-600">
+                                ₹{insufficientFunds.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
+                          {donationAmount > 0 && (
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-green-600">Donation Amount (₹)</span>
+                              <span className="text-xs sm:text-sm font-semibold text-green-600">
+                                ₹{donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quick Actions */}
       {isOwnProfile && (
