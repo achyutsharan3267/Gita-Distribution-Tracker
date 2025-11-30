@@ -538,8 +538,8 @@ const AdminDashboard = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
-            🔐 Admin Dashboard dev testing 
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-red-500 mb-2">
+            🔐 Admin Dashboard dev testing  
           </h1>
           <p className="text-sm sm:text-base text-gray-600">Manage users, profiles, and system settings</p>
         </div>
