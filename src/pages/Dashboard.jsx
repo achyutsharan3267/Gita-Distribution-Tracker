@@ -291,14 +291,27 @@ const Dashboard = () => {
           amountAsPerBooks += count * price;
         });
 
-        // Calculate Insufficient Funds (if Amount as per Books > Total Money Collected)
-        const insufficientFunds = amountAsPerBooks > currentUserProfile.totalMoney 
-          ? amountAsPerBooks - currentUserProfile.totalMoney 
+        // Calculate Money Collected from all activities (sum of money_online + money_offline)
+        // If activities are deleted, this will be 0
+        const activities = currentUserProfile.activities || [];
+        const totalOnlineAmount = activities.reduce((sum, activity) => {
+          return sum + (activity.moneyOnline || 0);
+        }, 0);
+        
+        const totalOfflineAmount = activities.reduce((sum, activity) => {
+          return sum + (activity.moneyOffline || 0);
+        }, 0);
+        
+        const moneyCollected = totalOnlineAmount + totalOfflineAmount;
+
+        // Calculate Insufficient Funds (if Amount as per Books > Money Collected)
+        const insufficientFunds = amountAsPerBooks > moneyCollected 
+          ? amountAsPerBooks - moneyCollected 
           : 0;
 
-        // Calculate Donation Amount (if Total Money Collected > Amount as per Books)
-        const donationAmount = currentUserProfile.totalMoney > amountAsPerBooks 
-          ? currentUserProfile.totalMoney - amountAsPerBooks 
+        // Calculate Donation Amount (if Money Collected > Amount as per Books)
+        const donationAmount = moneyCollected > amountAsPerBooks 
+          ? moneyCollected - amountAsPerBooks 
           : 0;
 
         return (
@@ -328,7 +341,7 @@ const Dashboard = () => {
                     <p className="text-xs text-gray-600 font-medium">Money Collected</p>
                   </div>
                   <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
-                    ₹{currentUserProfile.totalMoney.toLocaleString()}
+                    ₹{moneyCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Total collected</p>
                 </div>
@@ -370,6 +383,33 @@ const Dashboard = () => {
                     </p>
                   </div>
                 )}
+              </div>
+              
+              {/* Online and Offline Payment Details */}
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">💳</span>
+                    <p className="text-xs text-blue-600 font-medium">Online received Amount</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600 break-words">
+                    ₹{totalOnlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-blue-500 mt-1">Digital payments</p>
+                </div>
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">💵</span>
+                    <p className="text-xs text-orange-600 font-medium">Offline received Amount</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-orange-600 break-words">
+                    ₹{totalOfflineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-orange-500 mt-1">Cash payments</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <div className="bg-white/60 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-xl">🏆</span>

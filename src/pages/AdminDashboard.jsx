@@ -40,7 +40,7 @@ const AdminDashboard = () => {
   const [editActivityData, setEditActivityData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings', 'approvals', 'sadhna'
+  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings', 'approvals', 'payments', 'sadhna'
   const [pendingActivities, setPendingActivities] = useState([]);
   const [allSadhna, setAllSadhna] = useState([]);
   const [sadhnaLoading, setSadhnaLoading] = useState(false);
@@ -49,6 +49,8 @@ const AdminDashboard = () => {
   const [sadhnaDateFilter, setSadhnaDateFilter] = useState('');
   const [sadhnaCurrentPage, setSadhnaCurrentPage] = useState(1);
   const [sadhnaItemsPerPage, setSadhnaItemsPerPage] = useState(10);
+  const [allPayments, setAllPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
   
   // Books management state
   const [showAddBookModal, setShowAddBookModal] = useState(false);
@@ -329,6 +331,91 @@ const AdminDashboard = () => {
       toast.error('Failed to export sadhna: ' + error.message);
     }
   };
+
+  // Load all payments to admin (for count on tiles and full data when section is active)
+  useEffect(() => {
+    const loadAllPayments = async () => {
+      // Always load count, but only load full data when payments section is active
+      const loadFullData = activeSection === 'payments';
+      
+      setPaymentsLoading(loadFullData);
+      try {
+        console.log('Loading payments to admin...', { loadFullData });
+        
+        // If just loading count, only select id
+        const selectQuery = loadFullData ? `
+          *,
+          users (
+            id,
+            name
+          )
+        ` : 'id';
+        
+        const { data, error } = await supabase
+          .from('payments_to_admin')
+          .select(selectQuery)
+          .order('date', { ascending: false });
+
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+
+        console.log('Payments loaded:', data?.length || 0);
+
+        if (loadFullData && data && data.length > 0) {
+          // Fetch emails separately if available
+          let emailMap = {};
+          try {
+            const userIds = data.map(p => p.user_id).filter(Boolean);
+            if (userIds.length > 0) {
+              // Try to get emails using RPC function if available
+              const { data: emailsData } = await supabase.rpc('get_users_with_email').catch(() => ({ data: null }));
+              if (emailsData) {
+                emailsData.forEach((item) => {
+                  if (item.id && item.email) {
+                    emailMap[item.id] = item.email;
+                  }
+                });
+              }
+            }
+          } catch (err) {
+            console.log('Email fetch not available, continuing without email');
+          }
+
+          // Transform data to include user info
+          const paymentsWithUsers = data.map(payment => ({
+            ...payment,
+            userName: payment.users?.name || 'Unknown',
+            userEmail: emailMap[payment.user_id] || 'N/A'
+          }));
+
+          setAllPayments(paymentsWithUsers);
+        } else {
+          // Just update count
+          setAllPayments(data || []);
+        }
+      } catch (error) {
+        console.error('Error loading payments:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        if (loadFullData) {
+          toast.error('Failed to load payments: ' + error.message);
+        }
+        setAllPayments([]);
+      } finally {
+        if (loadFullData) {
+          setPaymentsLoading(false);
+        }
+      }
+    };
+
+    loadAllPayments();
+  }, [activeSection]);
 
   // Handle add book
   const handleAddBook = async () => {
@@ -777,6 +864,32 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* Payments History Tile */}
+        <div
+          onClick={() => setActiveSection('payments')}
+          className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+            activeSection === 'payments' ? 'ring-2 ring-spiritual-500 ring-offset-2' : ''
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center text-3xl">
+              💳
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">{allPayments.length}</p>
+              <p className="text-xs text-gray-500">Payments</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Payments History</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            View all user payments to admin and export to Excel
+          </p>
+          <div className="flex items-center text-spiritual-600 font-medium text-sm">
+            <span>View Details</span>
+            <span className="ml-2">→</span>
+          </div>
+        </div>
+
         {/* System Settings Tile */}
         <div
           onClick={() => setActiveSection('settings')}
@@ -935,6 +1048,112 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
+      )}
+
+      {/* Payments History Section */}
+      {activeSection === 'payments' && (
+        <div className="card p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">💳 Payments History (Pay to Admin)</h2>
+            <button
+              onClick={() => {
+                // Export to Excel
+                const excelData = allPayments.map((payment) => ({
+                  'Date': new Date(payment.date).toLocaleDateString('en-IN'),
+                  'User Name': payment.userName || 'Unknown',
+                  'User Email': payment.userEmail || 'N/A',
+                  'Online Amount (₹)': parseFloat(payment.money_online || 0).toFixed(2),
+                  'Offline Amount (₹)': parseFloat(payment.money_offline || 0).toFixed(2),
+                  'Total Amount (₹)': parseFloat(payment.total_amount || 0).toFixed(2),
+                }));
+
+                const worksheet = XLSX.utils.json_to_sheet(excelData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Payments History');
+
+                const dateStr = new Date().toISOString().split('T')[0];
+                const filename = `Payments_History_${dateStr}.xlsx`;
+                XLSX.writeFile(workbook, filename);
+                toast.success('Payments exported to Excel successfully!');
+              }}
+              className="btn-primary text-sm sm:text-base whitespace-nowrap"
+              disabled={allPayments.length === 0}
+            >
+              📥 Export to Excel
+            </button>
+          </div>
+
+          {paymentsLoading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Loading payments...</p>
+            </div>
+          ) : allPayments.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No payments found.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Email</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Online (₹)</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offline (₹)</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {allPayments.map((payment) => {
+                    const onlineAmount = parseFloat(payment.money_online || 0);
+                    const offlineAmount = parseFloat(payment.money_offline || 0);
+                    const total = parseFloat(payment.total_amount || 0);
+                    
+                    return (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(payment.date).toLocaleDateString('en-IN', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {payment.userName || 'Unknown'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                          {payment.userEmail || 'N/A'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-right">
+                          {onlineAmount > 0 ? (
+                            <span className="text-blue-600 font-medium">
+                              ₹{onlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-right">
+                          {offlineAmount > 0 ? (
+                            <span className="text-orange-600 font-medium">
+                              ₹{offlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
+                          ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Users Table */}
@@ -1179,7 +1398,7 @@ const AdminDashboard = () => {
                           <span className="font-semibold text-gray-900">₹{offlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                          <span className="font-medium text-gray-700">Total Money Received:</span>
+                          <span className="font-medium text-gray-700">Money Collected:</span>
                           <span className="font-bold text-gray-900">₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center">

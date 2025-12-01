@@ -774,16 +774,27 @@ export const useStore = create((set, get) => ({
   getTotalStats: () => {
     const state = get();
     const stats = state.users.reduce(
-      (acc, user) => ({
-        hindiGita: acc.hindiGita + user.hindiGita,
-        englishGita: acc.englishGita + user.englishGita,
-        smallBooks: acc.smallBooks + user.smallBooks,
-        bhagavatam: acc.bhagavatam + (user.bhagavatam || 0),
-        chaitanyaCharitamrita: acc.chaitanyaCharitamrita + (user.chaitanyaCharitamrita || 0),
-        otherBooks: acc.otherBooks + (user.otherBooks || 0),
-        totalMoney: acc.totalMoney + user.totalMoney,
-        totalUsers: state.users.length,
-      }),
+      (acc, user) => {
+        // Calculate money collected from activities instead of user.totalMoney
+        // This ensures accurate calculation even if activities are deleted
+        const userActivities = user.activities || [];
+        const userMoneyCollected = userActivities.reduce((sum, activity) => {
+          const onlineAmount = activity.moneyOnline || 0;
+          const offlineAmount = activity.moneyOffline || 0;
+          return sum + onlineAmount + offlineAmount;
+        }, 0);
+        
+        return {
+          hindiGita: acc.hindiGita + user.hindiGita,
+          englishGita: acc.englishGita + user.englishGita,
+          smallBooks: acc.smallBooks + user.smallBooks,
+          bhagavatam: acc.bhagavatam + (user.bhagavatam || 0),
+          chaitanyaCharitamrita: acc.chaitanyaCharitamrita + (user.chaitanyaCharitamrita || 0),
+          otherBooks: acc.otherBooks + (user.otherBooks || 0),
+          totalMoney: acc.totalMoney + userMoneyCollected, // Use calculated money from activities
+          totalUsers: state.users.length,
+        };
+      },
       { hindiGita: 0, englishGita: 0, smallBooks: 0, bhagavatam: 0, chaitanyaCharitamrita: 0, otherBooks: 0, totalMoney: 0, totalUsers: 0 }
     );
     
@@ -1310,16 +1321,23 @@ export const useStore = create((set, get) => ({
       if (error) throw error;
 
       // Sum up all activities
+      // Use money_online + money_offline instead of money_received for accurate calculation
       const totals = activities.reduce(
-        (acc, activity) => ({
-          hindi_gita: acc.hindi_gita + (activity.hindi_gita || 0),
-          english_gita: acc.english_gita + (activity.english_gita || 0),
-          small_books: acc.small_books + (activity.small_books || 0),
-          bhagavatam: acc.bhagavatam + (activity.bhagavatam || 0),
-          chaitanya_charitamrita: acc.chaitanya_charitamrita + (activity.chaitanya_charitamrita || 0),
-          other_books: acc.other_books + (activity.other_books || 0),
-          total_money: acc.total_money + parseFloat(activity.money_received || 0),
-        }),
+        (acc, activity) => {
+          const onlineAmount = parseFloat(activity.money_online || 0);
+          const offlineAmount = parseFloat(activity.money_offline || 0);
+          const totalMoney = onlineAmount + offlineAmount;
+          
+          return {
+            hindi_gita: acc.hindi_gita + (activity.hindi_gita || 0),
+            english_gita: acc.english_gita + (activity.english_gita || 0),
+            small_books: acc.small_books + (activity.small_books || 0),
+            bhagavatam: acc.bhagavatam + (activity.bhagavatam || 0),
+            chaitanya_charitamrita: acc.chaitanya_charitamrita + (activity.chaitanya_charitamrita || 0),
+            other_books: acc.other_books + (activity.other_books || 0),
+            total_money: acc.total_money + totalMoney,
+          };
+        },
         {
           hindi_gita: 0,
           english_gita: 0,
@@ -1863,6 +1881,7 @@ export const useStore = create((set, get) => ({
     }
   },
 
+<<<<<<< Updated upstream
   // Sadhna functions
   submitSadhna: async (sadhnaData, userId) => {
     try {
@@ -2023,6 +2042,50 @@ export const useStore = create((set, get) => ({
       }));
     } catch (error) {
       console.error('Error fetching user sadhna:', error);
+      throw error;
+    }
+  },
+
+  // Load payments to admin for a user
+  loadPaymentsToAdmin: async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('payments_to_admin')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error loading payments to admin:', error);
+      throw error;
+    }
+  },
+
+  // Submit payment to admin
+  submitPaymentToAdmin: async (userId, paymentData) => {
+    try {
+      const { data, error } = await supabase
+        .from('payments_to_admin')
+        .insert([
+          {
+            user_id: userId,
+            date: paymentData.date,
+            money_online: paymentData.onlineAmount || 0,
+            money_offline: paymentData.offlineAmount || 0,
+            total_amount: (paymentData.onlineAmount || 0) + (paymentData.offlineAmount || 0),
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error submitting payment to admin:', error);
       throw error;
     }
   },

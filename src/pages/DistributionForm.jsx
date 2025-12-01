@@ -342,7 +342,7 @@ const DistributionForm = () => {
                 {/* Calculated Fields */}
                 <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">Total Received Amount (₹)</span>
+                    <span className="text-sm font-medium text-gray-700">Money Collected (₹)</span>
                     <span className="text-base font-semibold text-gray-900">
                       {amounts.totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
@@ -420,7 +420,21 @@ const DistributionForm = () => {
             })}
             <div className="bg-gray-50 rounded-xl p-3 text-center">
               <p className="text-lg font-bold text-gray-900">
-                ₹{currentUserProfile.totalMoney.toLocaleString()}
+                ₹{(() => {
+                  // Calculate Money Collected from all activities (sum of money_online + money_offline)
+                  // This matches the calculation in Dashboard
+                  const activities = currentUserProfile.activities || [];
+                  const totalOnlineAmount = activities.reduce((sum, activity) => {
+                    return sum + (activity.moneyOnline || 0);
+                  }, 0);
+                  
+                  const totalOfflineAmount = activities.reduce((sum, activity) => {
+                    return sum + (activity.moneyOffline || 0);
+                  }, 0);
+                  
+                  const moneyCollected = totalOnlineAmount + totalOfflineAmount;
+                  return moneyCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                })()}
               </p>
               <p className="text-xs text-gray-500 mt-1">Total Money</p>
             </div>

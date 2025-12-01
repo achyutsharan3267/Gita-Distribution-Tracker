@@ -35,7 +35,14 @@ const UserProfile = () => {
   const loadBooks = useStore((state) => state.loadBooks);
   const loadUserActivities = useStore((state) => state.loadUserActivities);
   const getUserSadhna = useStore((state) => state.getUserSadhna);
+  const updateUserDistribution = useStore((state) => state.updateUserDistribution);
+  const recalculateUserTotals = useStore((state) => state.recalculateUserTotals);
+  const loadPaymentsToAdmin = useStore((state) => state.loadPaymentsToAdmin);
+  const submitPaymentToAdmin = useStore((state) => state.submitPaymentToAdmin);
   const user = users.find((u) => u.id === userId);
+  
+  // State for payments to admin
+  const [paymentsToAdmin, setPaymentsToAdmin] = useState([]);
   
   // Check if viewing own profile
   const isOwnProfile = currentUserProfile && currentUserProfile.id === userId;
@@ -46,6 +53,15 @@ const UserProfile = () => {
   // Sadhna graph data
   const [userSadhna, setUserSadhna] = useState([]);
   const [sadhnaLoading, setSadhnaLoading] = useState(true);
+  
+  // Modal state for Pay to Admin
+  const [showPayToAdminModal, setShowPayToAdminModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [paymentData, setPaymentData] = useState({
+    onlineAmount: '',
+    offlineAmount: '',
+    date: new Date().toISOString().split('T')[0]
+  });
 
   // Load books on mount
   useEffect(() => {
@@ -100,10 +116,74 @@ const UserProfile = () => {
 
     loadSadhna();
   }, [user?.id, getUserSadhna]);
+
+  // Load payments to admin
+  useEffect(() => {
+    if (user?.id && isOwnProfile) {
+      loadPaymentsToAdmin(user.id).then(payments => {
+        setPaymentsToAdmin(payments || []);
+      }).catch(err => {
+        console.warn('Could not load payments to admin:', err);
+        setPaymentsToAdmin([]);
+      });
+    }
+  }, [user?.id, loadPaymentsToAdmin, isOwnProfile]);
   
   const handleSubmitDistribution = () => {
     console.log('Submit Distribution button clicked');
     navigate('/form');
+  };
+
+  const handlePayToAdmin = () => {
+    setPaymentData({
+      onlineAmount: '',
+      offlineAmount: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+    setShowPayToAdminModal(true);
+  };
+
+  const handlePayClick = () => {
+    const online = parseFloat(paymentData.onlineAmount) || 0;
+    const offline = parseFloat(paymentData.offlineAmount) || 0;
+    
+    if (online === 0 && offline === 0) {
+      alert('Please enter at least one payment amount');
+      return;
+    }
+    
+    setShowPayToAdminModal(false);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    try {
+      const online = parseFloat(paymentData.onlineAmount) || 0;
+      const offline = parseFloat(paymentData.offlineAmount) || 0;
+
+      // Submit payment to admin (separate table, not activities)
+      await submitPaymentToAdmin(user.id, {
+        date: paymentData.date,
+        onlineAmount: online,
+        offlineAmount: offline,
+      });
+
+      // Reload payments to admin
+      const payments = await loadPaymentsToAdmin(user.id);
+      setPaymentsToAdmin(payments || []);
+
+      setShowConfirmModal(false);
+      setPaymentData({
+        onlineAmount: '',
+        offlineAmount: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+      
+      alert('Payment submitted successfully! You can view it in the "Payment History (Pay to Admin)" section below.');
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+      alert('Error submitting payment: ' + error.message);
+    }
   };
 
   if (!user) {
@@ -264,38 +344,59 @@ const UserProfile = () => {
                 amountAsPerBooks += count * price;
               });
 
-              // Calculate Insufficient Funds (if Amount as per Books > Total Money Collected)
-              const insufficientFunds = amountAsPerBooks > user.totalMoney 
-                ? amountAsPerBooks - user.totalMoney 
+              // Calculate Money Collected from all activities (sum of money_online + money_offline)
+              // If activities are deleted, this will be 0
+              const activities = user.activities || [];
+              const totalOnlineAmount = activities.reduce((sum, activity) => {
+                return sum + (activity.moneyOnline || 0);
+              }, 0);
+              
+              const totalOfflineAmount = activities.reduce((sum, activity) => {
+                return sum + (activity.moneyOffline || 0);
+              }, 0);
+              
+              const moneyCollected = totalOnlineAmount + totalOfflineAmount;
+
+              // Calculate Insufficient Funds (if Amount as per Books > Money Collected)
+              const insufficientFunds = amountAsPerBooks > moneyCollected 
+                ? amountAsPerBooks - moneyCollected 
                 : 0;
 
-              // Calculate Donation Amount (if Total Money Collected > Amount as per Books)
-              const donationAmount = user.totalMoney > amountAsPerBooks 
-                ? user.totalMoney - amountAsPerBooks 
+              // Calculate Donation Amount (if Money Collected > Amount as per Books)
+              const donationAmount = moneyCollected > amountAsPerBooks 
+                ? moneyCollected - amountAsPerBooks 
                 : 0;
 
               return (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">📊 Books & Price Details</h3>
+                    {isOwnProfile && (
+                      <button
+                        onClick={handlePayToAdmin}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow-md transition-colors"
+                      >
+                        💳 Pay to Admin
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="bg-gray-50 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
                       <p className="text-xs text-gray-500 mb-0.5">Total Books</p>
                       <p className="text-lg sm:text-xl font-bold text-gray-900">{totalDistributed}</p>
                     </div>
                     <div className="bg-gray-50 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
-                      <p className="text-xs text-gray-500 mb-0.5">Money Collected</p>
-                      <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
-                        ₹{user.totalMoney.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 col-span-2 lg:col-span-1">
                       <p className="text-xs text-gray-500 mb-0.5">Amount as per Books</p>
                       <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
                         ₹{amountAsPerBooks.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                      <p className="text-xs text-gray-500 mb-0.5">Money Collected</p>
+                      <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
+                        ₹{moneyCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
                     {insufficientFunds > 0 ? (
                       <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
                         <p className="text-xs text-red-600 mb-0.5">Insufficient Funds</p>
@@ -305,13 +406,47 @@ const UserProfile = () => {
                       </div>
                     ) : (
                       <div className={`rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 ${donationAmount > 0 ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
-                        <p className={`text-xs mb-0.5 ${donationAmount > 0 ? 'text-green-600' : 'text-gray-600'}`}>Donation Amount</p>
+                        <p className={`text-xs mb-0.5 ${donationAmount > 0 ? 'text-green-600' : 'text-gray-600'}`}>Donation Funds</p>
                         <p className={`text-lg sm:text-xl font-bold break-words ${donationAmount > 0 ? 'text-green-600' : 'text-gray-900'}`}>
                           ₹{donationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                     )}
                   </div>
+                  
+                  {/* Online and Offline Payment Details */}
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                      <p className="text-xs text-blue-600 mb-0.5">Online received Amount</p>
+                      <p className="text-lg sm:text-xl font-bold text-blue-600 break-words">
+                        ₹{totalOnlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                      <p className="text-xs text-orange-600 mb-0.5">Offline received Amount</p>
+                      <p className="text-lg sm:text-xl font-bold text-orange-600 break-words">
+                        ₹{totalOfflineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Paid Amount to Admin */}
+                  {isOwnProfile && (() => {
+                    const totalPaidToAdmin = paymentsToAdmin.reduce((sum, payment) => {
+                      return sum + (parseFloat(payment.total_amount || 0));
+                    }, 0);
+                    
+                    return (
+                      <div className="mt-3">
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3">
+                          <p className="text-xs text-emerald-600 mb-0.5">Paid Amount to Admin</p>
+                          <p className="text-lg sm:text-xl font-bold text-emerald-600 break-words">
+                            ₹{totalPaidToAdmin.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
@@ -692,7 +827,7 @@ const UserProfile = () => {
                         {/* Calculated Fields */}
                         <div className="bg-gray-50 rounded-xl p-2.5 sm:p-3 space-y-2">
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                            <span className="text-xs font-medium text-gray-700">Total Received Amount (₹)</span>
+                            <span className="text-xs font-medium text-gray-700">Money Collected (₹)</span>
                             <span className="text-xs sm:text-sm font-semibold text-gray-900 break-words">
                               ₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
@@ -827,7 +962,7 @@ const UserProfile = () => {
                       <div className="border-t border-yellow-200 pt-3 mt-3">
                         <div className="space-y-2 text-xs sm:text-sm">
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                            <span className="text-xs font-medium text-gray-700">Total Money Received (₹)</span>
+                            <span className="text-xs font-medium text-gray-700">Money Collected (₹)</span>
                             <span className="text-xs sm:text-sm font-semibold text-gray-900">
                               ₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
@@ -970,7 +1105,7 @@ const UserProfile = () => {
                       <div className="border-t border-red-200 pt-3 mt-3">
                         <div className="space-y-2 text-xs sm:text-sm">
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                            <span className="text-xs font-medium text-gray-700">Total Money Received (₹)</span>
+                            <span className="text-xs font-medium text-gray-700">Money Collected (₹)</span>
                             <span className="text-xs sm:text-sm font-semibold text-gray-900">
                               ₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
@@ -1009,6 +1144,64 @@ const UserProfile = () => {
         </div>
       )}
 
+      {/* Payment History Section */}
+      {isOwnProfile && paymentsToAdmin.length > 0 && (
+        <div className="card p-5">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <span className="mr-2">💳</span>
+            Payment History (Pay to Admin)
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Online (₹)</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offline (₹)</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total (₹)</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paymentsToAdmin.map((payment) => {
+                  const onlineAmount = parseFloat(payment.money_online || 0);
+                  const offlineAmount = parseFloat(payment.money_offline || 0);
+                  const total = parseFloat(payment.total_amount || 0);
+                  
+                  return (
+                    <tr key={payment.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(payment.date)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                        {onlineAmount > 0 ? (
+                          <span className="text-blue-600 font-medium">
+                            ₹{onlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                        {offlineAmount > 0 ? (
+                          <span className="text-orange-600 font-medium">
+                            ₹{offlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
+                        ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions */}
       {isOwnProfile && (
         <div className="flex justify-center">
@@ -1018,6 +1211,138 @@ const UserProfile = () => {
           >
             📝 Submit New Distribution
           </button>
+        </div>
+      )}
+
+      {/* Pay to Admin Modal - Form */}
+      {showPayToAdminModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900">💳 Pay to Admin</h2>
+              <button
+                onClick={() => setShowPayToAdminModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {/* Date Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={paymentData.date}
+                  onChange={(e) => setPaymentData({ ...paymentData, date: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spiritual-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Online Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pay Online (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={paymentData.onlineAmount}
+                  onChange={(e) => setPaymentData({ ...paymentData, onlineAmount: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spiritual-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Offline Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pay Offline (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={paymentData.offlineAmount}
+                  onChange={(e) => setPaymentData({ ...paymentData, offlineAmount: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spiritual-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Total */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700">Total (₹)</span>
+                  <span className="text-xl font-bold text-gray-900">
+                    ₹{((parseFloat(paymentData.onlineAmount) || 0) + (parseFloat(paymentData.offlineAmount) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Pay Button */}
+              <button
+                onClick={handlePayClick}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-colors text-base"
+              >
+                Pay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold text-gray-900">Confirm Payment</h2>
+            </div>
+            
+            <div className="p-6">
+              <div className="space-y-4 mb-6">
+                <p className="text-gray-700 text-base">
+                  Your online amount is <span className="font-semibold text-blue-600">₹{(parseFloat(paymentData.onlineAmount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> and offline amount is <span className="font-semibold text-orange-600">₹{(parseFloat(paymentData.offlineAmount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.
+                </p>
+                
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-base font-medium text-gray-700">Total Amount:</span>
+                    <span className="text-2xl font-bold text-green-600">
+                      ₹{((parseFloat(paymentData.onlineAmount) || 0) + (parseFloat(paymentData.offlineAmount) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+                
+                <p className="text-gray-600 text-sm">
+                  Do you want to submit this payment?
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setShowPayToAdminModal(true);
+                  }}
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-semibold transition-colors text-base"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmPayment}
+                  className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold shadow-md transition-colors text-base"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
