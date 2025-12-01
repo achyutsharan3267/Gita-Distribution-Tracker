@@ -212,7 +212,7 @@ const DistributionForm = () => {
       setIsSubmitting(false);
       
       // Show success message and redirect
-      toast.success('Distribution submitted! ⏳ Pending admin approval. 🙏', {
+      toast.success('Distribution submitted successfully! 🙏', {
         position: "top-right",
         autoClose: 3000,
       });

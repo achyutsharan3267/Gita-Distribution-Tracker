@@ -130,30 +130,8 @@ const Layout = ({ children }) => {
             return updated.filter(n => currentActivityIds.has(n.activityId)).slice(0, 20);
           });
           
-          // Check for truly new pending activities (not yet seen) for toast
-          const newPending = activities.filter(a => {
-            return !seenPendingIds.has(a.id);
-          });
-          
-          if (newPending.length > 0) {
-            // Mark these as seen and save to localStorage
-            const updatedSeenIds = new Set(seenPendingIds);
-            newPending.forEach(a => updatedSeenIds.add(a.id));
-            saveSeenPendingIds(updatedSeenIds);
-            
-            // Show toast for new pending activities
-            if (newPending.length === 1) {
-              toast.info(`⏳ ${newPending[0].user?.name || 'A user'} submitted a new activity for approval`, {
-                position: "top-right",
-                autoClose: 5000,
-              });
-            } else {
-              toast.info(`⏳ ${newPending.length} new activities pending approval`, {
-                position: "top-right",
-                autoClose: 5000,
-              });
-            }
-          }
+          // Activities are auto-approved now, no pending activities to show
+          // Removed pending activities toast since all activities are auto-approved
         } else {
           // No pending activities - clear notifications
           setAdminNotifications([]);
@@ -192,52 +170,8 @@ const Layout = ({ children }) => {
           return !seenActivityIds.has(`rejected-${a.id}`);
         });
         
-        // Handle new approved activities
-        if (newApproved.length > 0) {
-          // Mark these as seen and save to localStorage
-          const updatedSeenIds = new Set(seenActivityIds);
-          newApproved.forEach(a => updatedSeenIds.add(`approved-${a.id}`));
-          saveSeenNotificationIds(updatedSeenIds);
-          
-          // Show toast only once for new approvals
-          if (newApproved.length === 1) {
-            const totalBooks = newApproved[0].bookDistributions ? 
-              Object.values(newApproved[0].bookDistributions).reduce((sum, count) => sum + (count || 0), 0) :
-              (newApproved[0].hindiGita || 0) + (newApproved[0].englishGita || 0) + (newApproved[0].smallBooks || 0);
-            
-            toast.success(`✅ Your activity from ${new Date(newApproved[0].date).toLocaleDateString()} has been approved! (${totalBooks} books)`, {
-              position: "top-right",
-              autoClose: 5000,
-            });
-          } else {
-            toast.success(`✅ ${newApproved.length} activities approved! Check your profile.`, {
-              position: "top-right",
-              autoClose: 5000,
-            });
-          }
-          
-          // Add new notifications (avoid duplicates)
-          const newNotifications = newApproved.map(a => {
-            const totalBooks = a.bookDistributions ? 
-              Object.values(a.bookDistributions).reduce((sum, count) => sum + (count || 0), 0) :
-              (a.hindiGita || 0) + (a.englishGita || 0) + (a.smallBooks || 0);
-            
-            return {
-              id: `approved-${a.id}`,
-              activityId: a.id,
-              message: `✅ Your activity from ${new Date(a.date).toLocaleDateString()} has been approved! (${totalBooks} books)`,
-              date: a.date,
-              type: 'approved'
-            };
-          });
-          
-          setUserNotifications(prev => {
-            // Avoid duplicates
-            const existingIds = new Set(prev.map(n => n.activityId));
-            const uniqueNew = newNotifications.filter(n => !existingIds.has(n.activityId));
-            return [...uniqueNew, ...prev].slice(0, 20); // Keep last 20 notifications
-          });
-        }
+        // Activities are auto-approved now, no need to notify about approval
+        // Removed approval notification toast since all activities are auto-approved
         
         // Handle new rejected activities
         if (newRejected.length > 0) {
