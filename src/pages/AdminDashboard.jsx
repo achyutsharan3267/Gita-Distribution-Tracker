@@ -248,7 +248,8 @@ const AdminDashboard = () => {
   // Load sadhna data on component mount (to show count on tile)
   useEffect(() => {
     loadAllSadhna();
-  }, [getAllSadhna]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reload sadhna when sadhna section becomes active
   useEffect(() => {
@@ -256,7 +257,8 @@ const AdminDashboard = () => {
       loadAllSadhna();
       setSelectedSadhnaIds([]); // Reset selection when section changes
     }
-  }, [activeSection, getAllSadhna]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
 
   // Export sadhna to Excel
   const exportSadhnaToExcel = (sadhnaIds) => {

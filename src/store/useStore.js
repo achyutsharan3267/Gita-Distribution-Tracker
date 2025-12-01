@@ -1881,7 +1881,6 @@ export const useStore = create((set, get) => ({
     }
   },
 
-<<<<<<< Updated upstream
   // Sadhna functions
   submitSadhna: async (sadhnaData, userId) => {
     try {
