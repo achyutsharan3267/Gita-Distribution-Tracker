@@ -326,6 +326,9 @@ const UserProfile = () => {
               )}
             </h1>
             <div className="space-y-1 mb-3 sm:mb-4">
+              {user.email && (
+                <p className="text-xs sm:text-sm text-gray-600 break-words">📧 {user.email}</p>
+              )}
               {user.city && (
                 <p className="text-xs sm:text-sm text-gray-600 break-words">📍 {user.city}</p>
               )}

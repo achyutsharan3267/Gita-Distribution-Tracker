@@ -1,5 +1,5 @@
 import { useEffect, useRef, Component } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -63,6 +63,7 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
+  const location = useLocation();
   const initialize = useStore((state) => state.initialize);
   const cleanupRealtimeSubscriptions = useStore((state) => state.cleanupRealtimeSubscriptions);
   const loading = useStore((state) => state.loading);
@@ -70,6 +71,7 @@ function AppContent() {
   const { loading: authLoading, user } = useAuth();
   const initializedRef = useRef(false);
   const lastUserIdRef = useRef(null);
+  const isSignupPage = location.pathname === '/signup';
 
   // Cleanup subscriptions on unmount
   useEffect(() => {
@@ -79,6 +81,12 @@ function AppContent() {
   }, [cleanupRealtimeSubscriptions]);
 
   useEffect(() => {
+    // Don't initialize on signup page - let signup handle its own flow
+    if (isSignupPage) {
+      console.log('⏸️ Skipping initialization on signup page');
+      return;
+    }
+    
     // Only initialize once auth is loaded and user state is stable
     if (authLoading) {
       console.log('⏳ Waiting for auth to load...');
@@ -113,11 +121,11 @@ function AppContent() {
     } else {
       console.log('✅ Already initialized for this user, skipping...');
     }
-  }, [authLoading, user?.id]); // Only depend on authLoading and user.id, not the whole user object
+  }, [authLoading, user?.id, isSignupPage, location.pathname, initialize]);
 
   // Timeout fallback - if loading takes too long, show error
   useEffect(() => {
-    if (loading && !authLoading) {
+    if (loading && !authLoading && !isSignupPage) {
       const timeout = setTimeout(() => {
         console.warn('Loading timeout - forcing stop');
         useStore.setState({ 
@@ -128,7 +136,7 @@ function AppContent() {
 
       return () => clearTimeout(timeout);
     }
-  }, [loading, authLoading]);
+  }, [loading, authLoading, isSignupPage]);
 
   // Show loading only if auth is still loading OR store is loading
   // But allow app to proceed if auth is done (even if store has error)
@@ -156,8 +164,8 @@ function AppContent() {
     );
   }
 
-  // If store is loading but auth is done, show loading
-  if (loading) {
+  // If store is loading but auth is done, show loading (but not on signup page)
+  if (loading && !isSignupPage) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50 px-4">
         <div className="max-w-md w-full text-center">
@@ -181,7 +189,7 @@ function AppContent() {
     );
   }
 
-  if (error) {
+  if (error && !isSignupPage) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50 px-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-6 text-center">
@@ -203,24 +211,35 @@ function AppContent() {
   }
 
   return (
-    <Router>
-      <Layout>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-                  {/* Public routes - no login required */}
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/users" element={<UserList />} />
-                  <Route path="/user/:userId" element={<UserProfile />} />
-                  <Route path="/books" element={<BookBreakdown />} />
-                  <Route path="/books-prices" element={<BooksAndPrices />} />
-          {/* Protected routes - login required */}
-          <Route path="/form" element={<ProtectedRoute><DistributionForm /></ProtectedRoute>} />
-          <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
-          <Route path="/sadhna" element={<ProtectedRoute><SadhnaForm /></ProtectedRoute>} />
-          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-        </Routes>
-      </Layout>
+    <Layout>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        {/* Public routes - no login required */}
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/users" element={<UserList />} />
+        <Route path="/user/:userId" element={<UserProfile />} />
+        <Route path="/books" element={<BookBreakdown />} />
+        <Route path="/books-prices" element={<BooksAndPrices />} />
+        {/* Protected routes - login required */}
+        <Route path="/form" element={<ProtectedRoute><DistributionForm /></ProtectedRoute>} />
+        <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+        <Route path="/sadhna" element={<ProtectedRoute><SadhnaForm /></ProtectedRoute>} />
+        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        {/* Catch-all route - should not redirect, just show 404 */}
+        <Route path="*" element={
+          <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50 px-4">
+            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-6 text-center">
+              <div className="text-4xl mb-4">🔍</div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Page Not Found</h2>
+              <p className="text-gray-600 mb-4">The page you're looking for doesn't exist.</p>
+              <Link to="/" className="btn-primary inline-block">
+                Go to Dashboard
+              </Link>
+            </div>
+          </div>
+        } />
+      </Routes>
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -233,7 +252,7 @@ function AppContent() {
         pauseOnHover
         theme="light"
       />
-    </Router>
+    </Layout>
   );
 }
 
@@ -241,11 +260,12 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <Router>
+          <AppContent />
+        </Router>
       </AuthProvider>
     </ErrorBoundary>
   );
 }
 
 export default App;
-

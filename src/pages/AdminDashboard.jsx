@@ -26,6 +26,10 @@ const AdminDashboard = () => {
   const addBook = useStore((state) => state.addBook);
   const deleteBook = useStore((state) => state.deleteBook);
   const getAllSadhna = useStore((state) => state.getAllSadhna);
+  const approveUser = useStore((state) => state.approveUser);
+  const rejectUser = useStore((state) => state.rejectUser);
+  const getAppConfig = useStore((state) => state.getAppConfig);
+  const updateAppConfig = useStore((state) => state.updateAppConfig);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -44,6 +48,14 @@ const AdminDashboard = () => {
   const [pendingActivities, setPendingActivities] = useState([]);
   const [allSadhna, setAllSadhna] = useState([]);
   const [sadhnaLoading, setSadhnaLoading] = useState(false);
+  const [showApproveUserModal, setShowApproveUserModal] = useState(false);
+  const [userToApprove, setUserToApprove] = useState(null);
+  const [showApproveActivityModal, setShowApproveActivityModal] = useState(false);
+  const [activityToApprove, setActivityToApprove] = useState(null);
+  const [showRejectUserModal, setShowRejectUserModal] = useState(false);
+  const [userToReject, setUserToReject] = useState(null);
+  const [showRejectActivityModal, setShowRejectActivityModal] = useState(false);
+  const [activityToReject, setActivityToReject] = useState(null);
   const [selectedSadhnaIds, setSelectedSadhnaIds] = useState([]);
   const [sadhnaSearchQuery, setSadhnaSearchQuery] = useState('');
   const [sadhnaDateFilter, setSadhnaDateFilter] = useState('');
@@ -51,6 +63,8 @@ const AdminDashboard = () => {
   const [sadhnaItemsPerPage, setSadhnaItemsPerPage] = useState(10);
   const [allPayments, setAllPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [requireAdminApproval, setRequireAdminApproval] = useState(true);
+  const [configLoading, setConfigLoading] = useState(false);
   
   // Books management state
   const [showAddBookModal, setShowAddBookModal] = useState(false);
@@ -251,6 +265,19 @@ const AdminDashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load app config on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const value = await getAppConfig('require_admin_approval');
+        setRequireAdminApproval(value === 'true');
+      } catch (error) {
+        console.error('Error loading config:', error);
+      }
+    };
+    loadConfig();
+  }, [getAppConfig]);
+
   // Reload sadhna when sadhna section becomes active
   useEffect(() => {
     if (activeSection === 'sadhna') {
@@ -349,7 +376,9 @@ const AdminDashboard = () => {
           *,
           users (
             id,
-            name
+            name,
+            email,
+            mobile_number
           )
         ` : 'id';
         
@@ -366,30 +395,12 @@ const AdminDashboard = () => {
         console.log('Payments loaded:', data?.length || 0);
 
         if (loadFullData && data && data.length > 0) {
-          // Fetch emails separately if available
-          let emailMap = {};
-          try {
-            const userIds = data.map(p => p.user_id).filter(Boolean);
-            if (userIds.length > 0) {
-              // Try to get emails using RPC function if available
-              const { data: emailsData } = await supabase.rpc('get_users_with_email').catch(() => ({ data: null }));
-              if (emailsData) {
-                emailsData.forEach((item) => {
-                  if (item.id && item.email) {
-                    emailMap[item.id] = item.email;
-                  }
-                });
-              }
-            }
-          } catch (err) {
-            console.log('Email fetch not available, continuing without email');
-          }
-
           // Transform data to include user info
           const paymentsWithUsers = data.map(payment => ({
             ...payment,
             userName: payment.users?.name || 'Unknown',
-            userEmail: emailMap[payment.user_id] || 'N/A'
+            userEmail: payment.users?.email || 'N/A',
+            userMobileNumber: payment.users?.mobile_number || 'N/A'
           }));
 
           setAllPayments(paymentsWithUsers);
@@ -601,17 +612,31 @@ const AdminDashboard = () => {
   };
 
   const handleEditUser = (user) => {
+    // Calculate book counts from book_distributions (not from user object)
+    const calculatedBooks = books.reduce((acc, book) => {
+      const bookId = book.id || book.bookId;
+      acc[bookId] = getBookValue(user, bookId);
+      return acc;
+    }, {});
+    
+    // Calculate total money from activities
+    const activities = user.activities || [];
+    const calculatedTotalMoney = activities.reduce((sum, activity) => {
+      return sum + (activity.moneyOnline || 0) + (activity.moneyOffline || 0);
+    }, 0);
+    
     setEditData({
       name: user.name,
       city: user.city || '',
       mobileNumber: user.mobileNumber || '',
-      hindiGita: user.hindiGita,
-      englishGita: user.englishGita,
-      smallBooks: user.smallBooks,
-      bhagavatam: user.bhagavatam || 0,
-      chaitanyaCharitamrita: user.chaitanyaCharitamrita || 0,
-      otherBooks: user.otherBooks || 0,
-      totalMoney: user.totalMoney,
+      // Book counts are calculated, not stored - show 0 in edit (can't edit calculated values)
+      hindiGita: calculatedBooks.hindiGita || 0,
+      englishGita: calculatedBooks.englishGita || 0,
+      smallBooks: calculatedBooks.smallBooks || 0,
+      bhagavatam: calculatedBooks.bhagavatam || 0,
+      chaitanyaCharitamrita: calculatedBooks.chaitanyaCharitamrita || 0,
+      otherBooks: calculatedBooks.otherBooks || 0,
+      totalMoney: calculatedTotalMoney,
     });
     setSelectedUser(user);
     setShowEditModal(true);
@@ -892,6 +917,34 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* User Approvals Tile */}
+        <div
+          onClick={() => setActiveSection('approvals')}
+          className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+            activeSection === 'approvals' ? 'ring-2 ring-spiritual-500 ring-offset-2' : ''
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center text-3xl">
+              ✅
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">
+                {users.filter(u => u.approvalStatus === 'pending').length}
+              </p>
+              <p className="text-xs text-gray-500">Pending</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">User Approvals</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Approve or reject new user signups
+          </p>
+          <div className="flex items-center text-spiritual-600 font-medium text-sm">
+            <span>View Details</span>
+            <span className="ml-2">→</span>
+          </div>
+        </div>
+
         {/* System Settings Tile */}
         <div
           onClick={() => setActiveSection('settings')}
@@ -1064,6 +1117,7 @@ const AdminDashboard = () => {
                   'Date': new Date(payment.date).toLocaleDateString('en-IN'),
                   'User Name': payment.userName || 'Unknown',
                   'User Email': payment.userEmail || 'N/A',
+                  'Mobile Number': payment.userMobileNumber || 'N/A',
                   'Online Amount (₹)': parseFloat(payment.money_online || 0).toFixed(2),
                   'Offline Amount (₹)': parseFloat(payment.money_offline || 0).toFixed(2),
                   'Total Amount (₹)': parseFloat(payment.total_amount || 0).toFixed(2),
@@ -1101,6 +1155,7 @@ const AdminDashboard = () => {
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Email</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Mobile</th>
                     <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Online (₹)</th>
                     <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offline (₹)</th>
                     <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total (₹)</th>
@@ -1126,6 +1181,9 @@ const AdminDashboard = () => {
                         </td>
                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
                           {payment.userEmail || 'N/A'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                          {payment.userMobileNumber || 'N/A'}
                         </td>
                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-right">
                           {onlineAmount > 0 ? (
@@ -1155,6 +1213,146 @@ const AdminDashboard = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* User Approvals Section */}
+      {activeSection === 'approvals' && (
+        <div className="card p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">✅ User Approvals</h2>
+          
+          {(() => {
+            const pendingUsers = users.filter(u => u.approvalStatus === 'pending');
+            const rejectedUsers = users.filter(u => u.approvalStatus === 'rejected');
+            
+            if (pendingUsers.length === 0 && rejectedUsers.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">No pending or rejected users</p>
+                  <p className="text-gray-400 text-sm mt-2">All users have been approved</p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-6">
+                {/* Pending Users */}
+                {pendingUsers.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-bold">
+                        {pendingUsers.length}
+                      </span>
+                      Pending Approval
+                    </h3>
+                    <div className="space-y-3">
+                      {pendingUsers.map((user) => (
+                        <div key={user.id} className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <img
+                                src={user.photo}
+                                alt={user.name}
+                                className="w-12 h-12 rounded-full flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-gray-900 truncate">{user.name}</p>
+                                <p className="text-sm text-gray-600 truncate">{user.email || 'No email'}</p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {user.city && (
+                                    <span className="text-xs text-gray-500">📍 {user.city}</span>
+                                  )}
+                                  {user.other && (
+                                    <span className="text-xs text-gray-500">🏛️ {user.other}</span>
+                                  )}
+                                  {user.mobileNumber && (
+                                    <span className="text-xs text-gray-500">📱 {user.mobileNumber}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => {
+                                  setUserToApprove(user);
+                                  setShowApproveUserModal(true);
+                                }}
+                                disabled={loading}
+                                className="btn-primary bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 disabled:opacity-50"
+                              >
+                                ✅ Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setUserToReject(user);
+                                  setShowRejectUserModal(true);
+                                }}
+                                disabled={loading}
+                                className="btn-secondary bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 disabled:opacity-50"
+                              >
+                                ❌ Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rejected Users */}
+                {rejectedUsers.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-bold">
+                        {rejectedUsers.length}
+                      </span>
+                      Rejected Users
+                    </h3>
+                    <div className="space-y-3">
+                      {rejectedUsers.map((user) => (
+                        <div key={user.id} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <img
+                                src={user.photo}
+                                alt={user.name}
+                                className="w-12 h-12 rounded-full flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-gray-900 truncate">{user.name}</p>
+                                <p className="text-sm text-gray-600 truncate">{user.email || 'No email'}</p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {user.city && (
+                                    <span className="text-xs text-gray-500">📍 {user.city}</span>
+                                  )}
+                                  {user.other && (
+                                    <span className="text-xs text-gray-500">🏛️ {user.other}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => {
+                                  setUserToApprove(user);
+                                  setShowApproveUserModal(true);
+                                }}
+                                disabled={loading}
+                                className="btn-primary bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 disabled:opacity-50"
+                              >
+                                ✅ Approve
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1190,21 +1388,26 @@ const AdminDashboard = () => {
                     }, 0);
                     return (
                       <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
                           <div className="flex items-center">
                             <img
                               src={user.photo}
                               alt={user.name}
                               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-2 sm:mr-3 flex-shrink-0"
                             />
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm sm:text-base text-gray-900 truncate max-w-[120px] sm:max-w-none">
-                                {user.name}
-                              </span>
-                              {user.isAdmin && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-600 text-white">
-                                  Admin
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm sm:text-base text-gray-900 truncate max-w-[120px] sm:max-w-none">
+                                  {user.name}
                                 </span>
+                                {user.isAdmin && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-600 text-white">
+                                    Admin
+                                  </span>
+                                )}
+                              </div>
+                              {user.email && (
+                                <p className="text-xs text-gray-500 truncate mt-0.5">📧 {user.email}</p>
                               )}
                             </div>
                           </div>
@@ -1216,7 +1419,14 @@ const AdminDashboard = () => {
                           {totalBooks}
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-gray-900 text-sm sm:text-base hidden md:table-cell">
-                          ₹{user.totalMoney.toLocaleString()}
+                          {(() => {
+                            // Calculate total money from activities
+                            const activities = user.activities || [];
+                            const totalMoney = activities.reduce((sum, activity) => {
+                              return sum + (activity.moneyOnline || 0) + (activity.moneyOffline || 0);
+                            }, 0);
+                            return `₹${totalMoney.toLocaleString()}`;
+                          })()}
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                           <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -1427,29 +1637,11 @@ const AdminDashboard = () => {
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-yellow-200">
                     <button
                       type="button"
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        try {
-                          // Ensure we stay on approvals section
-                          setActiveSection('approvals');
-                          await approveActivity(activity.id);
-                          toast.success('Activity approved successfully');
-                          // Reload pending activities
-                          const updatedActivities = await loadPendingActivities();
-                          setPendingActivities(updatedActivities || []);
-                          // Refresh store without navigation
-                          const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
-                          if (currentAuthUser) {
-                            await useStore.getState().initialize(currentAuthUser);
-                          } else {
-                            await useStore.getState().initialize();
-                          }
-                          // Ensure we stay on approvals section after refresh
-                          setActiveSection('approvals');
-                        } catch (error) {
-                          toast.error('Failed to approve activity: ' + error.message);
-                        }
+                        setActivityToApprove(activity);
+                        setShowApproveActivityModal(true);
                       }}
                       className="btn-primary flex-1 text-sm sm:text-base px-4 py-2.5"
                     >
@@ -1457,22 +1649,11 @@ const AdminDashboard = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        try {
-                          // Ensure we stay on approvals section
-                          setActiveSection('approvals');
-                          await rejectActivity(activity.id);
-                          toast.success('Activity rejected');
-                          // Reload pending activities
-                          const updatedActivities = await loadPendingActivities();
-                          setPendingActivities(updatedActivities || []);
-                          // Ensure we stay on approvals section after refresh
-                          setActiveSection('approvals');
-                        } catch (error) {
-                          toast.error('Failed to reject activity: ' + error.message);
-                        }
+                        setActivityToReject(activity);
+                        setShowRejectActivityModal(true);
                       }}
                       className="btn-secondary flex-1 text-sm sm:text-base px-4 py-2.5 bg-red-50 text-red-700 hover:bg-red-100 border-red-300"
                     >
@@ -1491,6 +1672,71 @@ const AdminDashboard = () => {
       <div className="card p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">⚙️ System Settings</h2>
         <div className="space-y-4">
+          {/* Admin Approval Toggle */}
+          <div className="border border-gray-200 rounded-lg p-4 sm:p-6 bg-white">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800 mb-1 text-lg">Admin Approval Required</h3>
+                <p className="text-sm text-gray-600">
+                  {requireAdminApproval 
+                    ? 'New users need admin approval before they can login.'
+                    : 'New users can login immediately after signup without approval.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-medium ${requireAdminApproval ? 'text-gray-500' : 'text-green-600'}`}>
+                  OFF
+                </span>
+                <button
+                  onClick={async () => {
+                    const newValue = !requireAdminApproval;
+                    setConfigLoading(true);
+                    try {
+                      await updateAppConfig('require_admin_approval', newValue ? 'true' : 'false');
+                      setRequireAdminApproval(newValue);
+                      toast.success(
+                        newValue 
+                          ? 'Admin approval is now required for new users'
+                          : 'Users can now login immediately after signup',
+                        {
+                          position: "top-right",
+                          autoClose: 3000,
+                        }
+                      );
+                    } catch (error) {
+                      toast.error(`Error updating setting: ${error.message}`, {
+                        position: "top-right",
+                        autoClose: 4000,
+                      });
+                    } finally {
+                      setConfigLoading(false);
+                    }
+                  }}
+                  disabled={configLoading}
+                  className={`relative inline-flex h-8 w-14 sm:h-10 sm:w-18 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-spiritual-500 focus:ring-offset-2 ${
+                    requireAdminApproval ? 'bg-green-600' : 'bg-gray-300'
+                  } ${configLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 sm:h-8 sm:w-8 transform rounded-full bg-white transition-transform ${
+                      requireAdminApproval ? 'translate-x-7 sm:translate-x-9' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className={`text-sm font-medium ${requireAdminApproval ? 'text-green-600' : 'text-gray-500'}`}>
+                  ON
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-800">
+                <strong>Note:</strong> {requireAdminApproval 
+                  ? 'When ON, new signups will be pending until you approve them in the "User Approvals" section.'
+                  : 'When OFF, new users are automatically approved and can login immediately.'}
+              </p>
+            </div>
+          </div>
+
           <div className="border border-gray-200 rounded-lg p-4">
             <h3 className="font-semibold text-gray-800 mb-2">Database Information</h3>
             <p className="text-sm text-gray-600">Total Users: {users.length}</p>
@@ -1507,10 +1753,6 @@ const AdminDashboard = () => {
                            (u.otherBooks || 0);
               return total > 0;
             }).length}</p>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-2">Coming Soon</h3>
-            <p className="text-sm text-gray-600">More settings and configuration options will be available here.</p>
           </div>
         </div>
       </div>
@@ -2413,6 +2655,292 @@ const AdminDashboard = () => {
                   setShowDeleteBookModal(false);
                   setBookToDelete(null);
                 }}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve User Confirmation Modal */}
+      {showApproveUserModal && userToApprove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">✅</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Approve User?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+              Are you sure you want to approve <span className="font-semibold text-gray-800">{userToApprove.name}</span>?
+            </p>
+            <p className="text-xs sm:text-sm text-green-600 text-center mb-6 bg-green-50 border border-green-200 rounded-lg p-3">
+              ✅ After approval, this user will be able to login and access the application.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    await approveUser(userToApprove.id);
+                    toast.success(`${userToApprove.name} has been approved!`, {
+                      position: "top-right",
+                      autoClose: 3000,
+                    });
+                    setShowApproveUserModal(false);
+                    setUserToApprove(null);
+                    // Reload users to refresh the list
+                    const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
+                    if (currentAuthUser) {
+                      await useStore.getState().initialize(currentAuthUser);
+                    } else {
+                      await useStore.getState().initialize();
+                    }
+                  } catch (err) {
+                    toast.error(`Error: ${err.message}`, {
+                      position: "top-right",
+                      autoClose: 4000,
+                    });
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-green-600 hover:bg-green-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Approving...' : 'Yes, Approve User'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowApproveUserModal(false);
+                  setUserToApprove(null);
+                }}
+                disabled={loading}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Activity Confirmation Modal */}
+      {showApproveActivityModal && activityToApprove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">✅</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Approve Activity?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-4">
+              Are you sure you want to approve this activity?
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
+              <p className="text-xs sm:text-sm text-gray-700">
+                <span className="font-semibold">User:</span> {activityToApprove.user?.name || 'Unknown'}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-700 mt-1">
+                <span className="font-semibold">Date:</span> {new Date(activityToApprove.date).toLocaleDateString()}
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-green-600 text-center mb-6 bg-green-50 border border-green-200 rounded-lg p-3">
+              ✅ After approval, this activity will be visible to the user and included in their statistics.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    setLoading(true);
+                    // Ensure we stay on approvals section
+                    setActiveSection('approvals');
+                    await approveActivity(activityToApprove.id);
+                    toast.success('Activity approved successfully');
+                    // Reload pending activities
+                    const updatedActivities = await loadPendingActivities();
+                    setPendingActivities(updatedActivities || []);
+                    // Refresh store without navigation
+                    const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
+                    if (currentAuthUser) {
+                      await useStore.getState().initialize(currentAuthUser);
+                    } else {
+                      await useStore.getState().initialize();
+                    }
+                    // Ensure we stay on approvals section after refresh
+                    setActiveSection('approvals');
+                    setShowApproveActivityModal(false);
+                    setActivityToApprove(null);
+                  } catch (error) {
+                    toast.error('Failed to approve activity: ' + error.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-green-600 hover:bg-green-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Approving...' : 'Yes, Approve Activity'}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowApproveActivityModal(false);
+                  setActivityToApprove(null);
+                }}
+                disabled={loading}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject User Confirmation Modal */}
+      {showRejectUserModal && userToReject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">❌</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Reject & Delete User?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+              Are you sure you want to reject and delete <span className="font-semibold text-gray-800">{userToReject.name}</span>?
+            </p>
+            <p className="text-xs sm:text-sm text-red-600 text-center mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
+              ⚠️ This action cannot be undone. All user data including profile, activities, payments, and sadhna will be permanently deleted from the database. The user will need to signup again if they want to try again.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    await rejectUser(userToReject.id);
+                    toast.success(`${userToReject.name} has been rejected and deleted.`, {
+                      position: "top-right",
+                      autoClose: 3000,
+                    });
+                    setShowRejectUserModal(false);
+                    setUserToReject(null);
+                    // Reload users to refresh the list - wait a bit for DB to sync
+                    setTimeout(async () => {
+                      const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
+                      if (currentAuthUser) {
+                        await useStore.getState().initialize(currentAuthUser);
+                      } else {
+                        await useStore.getState().initialize();
+                      }
+                    }, 500);
+                  } catch (err) {
+                    console.error('Reject user error:', err);
+                    toast.error(`Error: ${err.message}. Please check if DELETE policy is set in database.`, {
+                      position: "top-right",
+                      autoClose: 5000,
+                    });
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-red-600 hover:bg-red-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Deleting...' : 'Yes, Delete User'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowRejectUserModal(false);
+                  setUserToReject(null);
+                }}
+                disabled={loading}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Activity Confirmation Modal */}
+      {showRejectActivityModal && activityToReject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">❌</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Reject Activity?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-4">
+              Are you sure you want to reject this activity?
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
+              <p className="text-xs sm:text-sm text-gray-700">
+                <span className="font-semibold">User:</span> {activityToReject.user?.name || 'Unknown'}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-700 mt-1">
+                <span className="font-semibold">Date:</span> {new Date(activityToReject.date).toLocaleDateString()}
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-red-600 text-center mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
+              ❌ After rejection, this activity will not be visible to the user and will not be included in their statistics.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    setLoading(true);
+                    // Ensure we stay on approvals section
+                    setActiveSection('approvals');
+                    await rejectActivity(activityToReject.id);
+                    toast.success('Activity rejected');
+                    // Reload pending activities
+                    const updatedActivities = await loadPendingActivities();
+                    setPendingActivities(updatedActivities || []);
+                    // Ensure we stay on approvals section after refresh
+                    setActiveSection('approvals');
+                    setShowRejectActivityModal(false);
+                    setActivityToReject(null);
+                  } catch (error) {
+                    toast.error('Failed to reject activity: ' + error.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-red-600 hover:bg-red-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Rejecting...' : 'Yes, Reject Activity'}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowRejectActivityModal(false);
+                  setActivityToReject(null);
+                }}
+                disabled={loading}
                 className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
               >
                 Cancel

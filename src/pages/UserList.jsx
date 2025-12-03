@@ -251,6 +251,9 @@ const UserList = () => {
                         {user.name}
                       </h3>
                       <div className="space-y-0.5 mt-1">
+                        {user.email && (
+                          <p className="text-gray-500 text-xs truncate">📧 {user.email}</p>
+                        )}
                         <p className="text-gray-500 text-xs truncate">🏛️ {user.other || 'Other'}</p>
                         {user.city && (
                           <p className="text-gray-500 text-xs truncate">📍 {user.city}</p>
@@ -369,6 +372,9 @@ const UserList = () => {
                               <p className="font-semibold text-sm text-gray-900 group-hover:text-primary-600 truncate transition-colors">
                                 {user.name}
                               </p>
+                              {user.email && (
+                                <p className="text-xs text-gray-500 truncate mt-0.5">📧 {user.email}</p>
+                              )}
                               {user.mobileNumber && (
                                 <p className="text-xs text-gray-500 truncate mt-0.5">📱 {formatMobileNumber(user.mobileNumber, isAdmin, currentUserProfile?.id === user.id)} {user.city && `• ${user.city}`}</p>
                               )}

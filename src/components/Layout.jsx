@@ -8,8 +8,10 @@ import introJs from 'intro.js';
 const Layout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut, isAdmin: isAdminFromAuth } = useAuth();
   const currentUserProfile = useStore((state) => state.currentUserProfile);
+  // Use isAdmin from profile if available, otherwise use from AuthContext
+  const isAdmin = currentUserProfile?.isAdmin || isAdminFromAuth;
   const loadPendingActivities = useStore((state) => state.loadPendingActivities);
   const loadUserActivities = useStore((state) => state.loadUserActivities);
   const [showUserMenu, setShowUserMenu] = useState(false);

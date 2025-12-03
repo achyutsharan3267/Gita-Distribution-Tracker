@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
 import { uploadProfilePhoto, deleteProfilePhoto } from '../utils/storage';
 import { supabase } from '../lib/supabase';
-import { getBookValue } from '../utils/bookMapping';
 
 const EditProfile = () => {
   const navigate = useNavigate();
@@ -14,8 +13,6 @@ const EditProfile = () => {
   const initialize = useStore((state) => state.initialize);
   const getCurrentUserProfile = useStore((state) => state.getCurrentUserProfile);
   const loading = useStore((state) => state.loading);
-  const books = useStore((state) => state.books);
-  const loadBooks = useStore((state) => state.loadBooks);
 
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
@@ -65,18 +62,6 @@ const EditProfile = () => {
     }
   }, [currentUserProfile]);
 
-  // Load books from database on mount
-  useEffect(() => {
-    const initializeBooks = async () => {
-      try {
-        await loadBooks();
-      } catch (error) {
-        console.error('Error loading books:', error);
-      }
-    };
-    
-    initializeBooks();
-  }, [loadBooks]);
 
   // Show loading state
   if (authLoading || loading || profileLoading || !user) {
@@ -321,39 +306,6 @@ const EditProfile = () => {
           <p className="text-xs text-gray-500 mt-1">
             Select your bace (Required)
           </p>
-        </div>
-
-        {/* Current Stats (Read-only) */}
-        <div className="border-t border-gray-100 pt-5">
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Your Current Stats</h3>
-          {!currentUserProfile ? (
-            <p className="text-center text-gray-400 py-4 text-sm italic">
-              "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
-            </p>
-          ) : books.length === 0 ? (
-            <p className="text-center text-gray-400 py-4 text-sm italic">
-              "Everything will come in due course of time. Be patient and continue your Krishna consciousness sincerely."
-            </p>
-          ) : (
-            <div className={`grid gap-3 ${books.length <= 3 ? 'grid-cols-2 sm:grid-cols-4' : books.length <= 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'}`}>
-              {books.map((book) => {
-                const bookId = book.id || book.bookId;
-                const value = getBookValue(currentUserProfile, bookId);
-                return (
-                  <div key={bookId} className="bg-gray-50 rounded-xl p-3 text-center">
-                    <p className="text-lg font-bold text-gray-900">{value || 0}</p>
-                    <p className="text-xs text-gray-500 truncate mt-1">{book.name}</p>
-                  </div>
-                );
-              })}
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-lg font-bold text-gray-900">
-                  ₹{currentUserProfile.totalMoney.toLocaleString()}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Total Money</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Buttons */}
