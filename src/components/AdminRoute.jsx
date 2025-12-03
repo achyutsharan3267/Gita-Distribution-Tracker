@@ -1,13 +1,34 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useStore } from '../store/useStore';
 import ProtectedRoute from './ProtectedRoute';
+import { useEffect, useState } from 'react';
 
 const AdminRoute = ({ children }) => {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin: isAdminFromAuth, loading: authLoading, user } = useAuth();
+  const currentUserProfile = useStore((state) => state.currentUserProfile);
+  const storeLoading = useStore((state) => state.loading);
+  // Use isAdmin from profile if available, otherwise use from AuthContext
+  const isAdmin = currentUserProfile?.isAdmin || isAdminFromAuth;
+  const [adminCheckComplete, setAdminCheckComplete] = useState(false);
+
+  // Wait for both auth and store to be ready before checking admin status
+  useEffect(() => {
+    if (!authLoading && !storeLoading) {
+      // Give a small delay to ensure admin check has completed
+      const timer = setTimeout(() => {
+        setAdminCheckComplete(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    } else if (!user) {
+      // If no user, we can proceed immediately
+      setAdminCheckComplete(true);
+    }
+  }, [authLoading, storeLoading, user, currentUserProfile?.isAdmin]);
 
   return (
     <ProtectedRoute>
-      {loading ? (
+      {authLoading || !adminCheckComplete ? (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-50 to-primary-50">
           <div className="text-center max-w-md px-4">
             <img 

@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { getBookValue, getStatsBookValue, getActivityBookValue } from '../utils/bookMapping';
+import * as XLSX from 'xlsx';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -24,6 +25,11 @@ const AdminDashboard = () => {
   const loadBooks = useStore((state) => state.loadBooks);
   const addBook = useStore((state) => state.addBook);
   const deleteBook = useStore((state) => state.deleteBook);
+  const getAllSadhna = useStore((state) => state.getAllSadhna);
+  const approveUser = useStore((state) => state.approveUser);
+  const rejectUser = useStore((state) => state.rejectUser);
+  const getAppConfig = useStore((state) => state.getAppConfig);
+  const updateAppConfig = useStore((state) => state.updateAppConfig);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -38,8 +44,27 @@ const AdminDashboard = () => {
   const [editActivityData, setEditActivityData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings', 'approvals'
+  const [activeSection, setActiveSection] = useState('tiles'); // 'tiles', 'users', 'books', 'settings', 'approvals', 'payments', 'sadhna'
   const [pendingActivities, setPendingActivities] = useState([]);
+  const [allSadhna, setAllSadhna] = useState([]);
+  const [sadhnaLoading, setSadhnaLoading] = useState(false);
+  const [showApproveUserModal, setShowApproveUserModal] = useState(false);
+  const [userToApprove, setUserToApprove] = useState(null);
+  const [showApproveActivityModal, setShowApproveActivityModal] = useState(false);
+  const [activityToApprove, setActivityToApprove] = useState(null);
+  const [showRejectUserModal, setShowRejectUserModal] = useState(false);
+  const [userToReject, setUserToReject] = useState(null);
+  const [showRejectActivityModal, setShowRejectActivityModal] = useState(false);
+  const [activityToReject, setActivityToReject] = useState(null);
+  const [selectedSadhnaIds, setSelectedSadhnaIds] = useState([]);
+  const [sadhnaSearchQuery, setSadhnaSearchQuery] = useState('');
+  const [sadhnaDateFilter, setSadhnaDateFilter] = useState('');
+  const [sadhnaCurrentPage, setSadhnaCurrentPage] = useState(1);
+  const [sadhnaItemsPerPage, setSadhnaItemsPerPage] = useState(10);
+  const [allPayments, setAllPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [requireAdminApproval, setRequireAdminApproval] = useState(true);
+  const [configLoading, setConfigLoading] = useState(false);
   
   // Books management state
   const [showAddBookModal, setShowAddBookModal] = useState(false);
@@ -219,6 +244,191 @@ const AdminDashboard = () => {
       return () => clearInterval(interval);
     }
   }, [loadPendingActivities, activeSection]);
+
+  // Load all sadhna when sadhna section is active
+  const loadAllSadhna = async () => {
+    setSadhnaLoading(true);
+    try {
+      const sadhna = await getAllSadhna();
+      setAllSadhna(sadhna || []);
+    } catch (error) {
+      console.error('Error loading sadhna:', error);
+      toast.error('Failed to load sadhna: ' + error.message);
+    } finally {
+      setSadhnaLoading(false);
+    }
+  };
+
+  // Load sadhna data on component mount (to show count on tile)
+  useEffect(() => {
+    loadAllSadhna();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load app config on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const value = await getAppConfig('require_admin_approval');
+        setRequireAdminApproval(value === 'true');
+      } catch (error) {
+        console.error('Error loading config:', error);
+      }
+    };
+    loadConfig();
+  }, [getAppConfig]);
+
+  // Reload sadhna when sadhna section becomes active
+  useEffect(() => {
+    if (activeSection === 'sadhna') {
+      loadAllSadhna();
+      setSelectedSadhnaIds([]); // Reset selection when section changes
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
+
+  // Export sadhna to Excel
+  const exportSadhnaToExcel = (sadhnaIds) => {
+    try {
+      // Filter selected sadhna entries
+      const selectedSadhna = allSadhna.filter(s => sadhnaIds.includes(s.id));
+      
+      if (selectedSadhna.length === 0) {
+        toast.error('No sadhna entries selected');
+        return;
+      }
+
+      // Prepare data for Excel
+      const excelData = selectedSadhna.map((sadhna) => {
+        return {
+          'Date': new Date(sadhna.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          'User Name': sadhna.userName,
+          'Email': sadhna.userEmail || '',
+          'Wake Up Time': sadhna.wakeUpTime || 'Not recorded',
+          'Mangla Arti': sadhna.manglaArti ? 'Yes' : 'No',
+          'Tulsi Arti': sadhna.tulsiArti ? 'Yes' : 'No',
+          'Guru Puja': sadhna.guruPuja ? 'Yes' : 'No',
+          'Sandhya Arti': sadhna.sandhyaArti ? 'Yes' : 'No',
+          'First Round Timing': sadhna.firstRoundTiming || 'Not recorded',
+          'Last Round Timing': sadhna.lastRoundTiming || 'Not recorded',
+          'Total Rounds': sadhna.totalRounds || 0,
+          'Lecture Hearing': sadhna.lectureHearing || 'Not done',
+          'Book Reading': sadhna.bookReading || 'Not done',
+          'Services Done': sadhna.servicesDone || 'No services recorded',
+        };
+      });
+
+      // Create workbook and worksheet
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sadhna Chart');
+
+      // Set column widths
+      const columnWidths = [
+        { wch: 20 }, // Date
+        { wch: 20 }, // User Name
+        { wch: 25 }, // Email
+        { wch: 15 }, // Wake Up Time
+        { wch: 12 }, // Mangla Arti
+        { wch: 12 }, // Tulsi Arti
+        { wch: 12 }, // Guru Puja
+        { wch: 12 }, // Sandhya Arti
+        { wch: 18 }, // First Round Timing
+        { wch: 18 }, // Last Round Timing
+        { wch: 12 }, // Total Rounds
+        { wch: 30 }, // Lecture Hearing
+        { wch: 30 }, // Book Reading
+        { wch: 30 }, // Services Done
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Generate filename with current date
+      const date = new Date();
+      const dateStr = date.toISOString().split('T')[0];
+      const count = selectedSadhna.length === allSadhna.length ? 'All' : selectedSadhna.length;
+      const filename = `Sadhna_Chart_${count}_${dateStr}.xlsx`;
+
+      // Write file and trigger download
+      XLSX.writeFile(workbook, filename);
+      
+      toast.success(`Exported ${selectedSadhna.length} sadhna entries to Excel`, {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error('Error exporting sadhna:', error);
+      toast.error('Failed to export sadhna: ' + error.message);
+    }
+  };
+
+  // Load all payments to admin (for count on tiles and full data when section is active)
+  useEffect(() => {
+    const loadAllPayments = async () => {
+      // Always load count, but only load full data when payments section is active
+      const loadFullData = activeSection === 'payments';
+      
+      setPaymentsLoading(loadFullData);
+      try {
+        console.log('Loading payments to admin...', { loadFullData });
+        
+        // If just loading count, only select id
+        const selectQuery = loadFullData ? `
+          *,
+          users (
+            id,
+            name,
+            email,
+            mobile_number
+          )
+        ` : 'id';
+        
+        const { data, error } = await supabase
+          .from('payments_to_admin')
+          .select(selectQuery)
+          .order('date', { ascending: false });
+
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+
+        console.log('Payments loaded:', data?.length || 0);
+
+        if (loadFullData && data && data.length > 0) {
+          // Transform data to include user info
+          const paymentsWithUsers = data.map(payment => ({
+            ...payment,
+            userName: payment.users?.name || 'Unknown',
+            userEmail: payment.users?.email || 'N/A',
+            userMobileNumber: payment.users?.mobile_number || 'N/A'
+          }));
+
+          setAllPayments(paymentsWithUsers);
+        } else {
+          // Just update count
+          setAllPayments(data || []);
+        }
+      } catch (error) {
+        console.error('Error loading payments:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        if (loadFullData) {
+          toast.error('Failed to load payments: ' + error.message);
+        }
+        setAllPayments([]);
+      } finally {
+        if (loadFullData) {
+          setPaymentsLoading(false);
+        }
+      }
+    };
+
+    loadAllPayments();
+  }, [activeSection]);
 
   // Handle add book
   const handleAddBook = async () => {
@@ -402,17 +612,31 @@ const AdminDashboard = () => {
   };
 
   const handleEditUser = (user) => {
+    // Calculate book counts from book_distributions (not from user object)
+    const calculatedBooks = books.reduce((acc, book) => {
+      const bookId = book.id || book.bookId;
+      acc[bookId] = getBookValue(user, bookId);
+      return acc;
+    }, {});
+    
+    // Calculate total money from activities
+    const activities = user.activities || [];
+    const calculatedTotalMoney = activities.reduce((sum, activity) => {
+      return sum + (activity.moneyOnline || 0) + (activity.moneyOffline || 0);
+    }, 0);
+    
     setEditData({
       name: user.name,
       city: user.city || '',
       mobileNumber: user.mobileNumber || '',
-      hindiGita: user.hindiGita,
-      englishGita: user.englishGita,
-      smallBooks: user.smallBooks,
-      bhagavatam: user.bhagavatam || 0,
-      chaitanyaCharitamrita: user.chaitanyaCharitamrita || 0,
-      otherBooks: user.otherBooks || 0,
-      totalMoney: user.totalMoney,
+      // Book counts are calculated, not stored - show 0 in edit (can't edit calculated values)
+      hindiGita: calculatedBooks.hindiGita || 0,
+      englishGita: calculatedBooks.englishGita || 0,
+      smallBooks: calculatedBooks.smallBooks || 0,
+      bhagavatam: calculatedBooks.bhagavatam || 0,
+      chaitanyaCharitamrita: calculatedBooks.chaitanyaCharitamrita || 0,
+      otherBooks: calculatedBooks.otherBooks || 0,
+      totalMoney: calculatedTotalMoney,
     });
     setSelectedUser(user);
     setShowEditModal(true);
@@ -538,8 +762,8 @@ const AdminDashboard = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-spiritual-800 mb-2">
-            🔐 Admin Dashboard
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-red-500 mb-2">
+            🔐 Admin Dashboard dev testing  
           </h1>
           <p className="text-sm sm:text-base text-gray-600">Manage users, profiles, and system settings</p>
         </div>
@@ -556,7 +780,7 @@ const AdminDashboard = () => {
 
       {/* Management Tiles - Always visible */}
       {activeSection === 'tiles' && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="tour-admin-tiles grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Manage Users Tile */}
         <div
           onClick={() => setActiveSection('users')}
@@ -628,6 +852,92 @@ const AdminDashboard = () => {
           <h3 className="text-xl font-bold text-gray-800 mb-2">Manage Books</h3>
           <p className="text-sm text-gray-600 mb-4">
             Add, edit, or delete books and manage prices
+          </p>
+          <div className="flex items-center text-spiritual-600 font-medium text-sm">
+            <span>View Details</span>
+            <span className="ml-2">→</span>
+          </div>
+        </div>
+
+        {/* Sadhna Management Tile */}
+        <div
+          onClick={() => setActiveSection('sadhna')}
+          className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+            activeSection === 'sadhna' ? 'ring-2 ring-spiritual-500 ring-offset-2' : ''
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center text-3xl">
+              🕉️
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">
+                {(() => {
+                  // Count unique users who have submitted sadhna
+                  const uniqueUserIds = new Set(allSadhna.map(s => s.userId));
+                  return uniqueUserIds.size;
+                })()}
+              </p>
+              <p className="text-xs text-gray-500">Sadhna Devotees</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Sadhna Management</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            View all users' daily sadhna charts
+          </p>
+          <div className="flex items-center text-spiritual-600 font-medium text-sm">
+            <span>View Details</span>
+            <span className="ml-2">→</span>
+          </div>
+        </div>
+
+        {/* Payments History Tile */}
+        <div
+          onClick={() => setActiveSection('payments')}
+          className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+            activeSection === 'payments' ? 'ring-2 ring-spiritual-500 ring-offset-2' : ''
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center text-3xl">
+              💳
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">{allPayments.length}</p>
+              <p className="text-xs text-gray-500">Payments</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Payments History</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            View all user payments to admin and export to Excel
+          </p>
+          <div className="flex items-center text-spiritual-600 font-medium text-sm">
+            <span>View Details</span>
+            <span className="ml-2">→</span>
+          </div>
+        </div>
+
+        {/* User Approvals Tile */}
+        <div
+          onClick={() => setActiveSection('approvals')}
+          className={`card p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 ${
+            activeSection === 'approvals' ? 'ring-2 ring-spiritual-500 ring-offset-2' : ''
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center text-3xl">
+              ✅
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800">
+                {users.filter(u => u.approvalStatus === 'pending').length}
+              </p>
+              <p className="text-xs text-gray-500">Pending</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">User Approvals</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Approve or reject new user signups
           </p>
           <div className="flex items-center text-spiritual-600 font-medium text-sm">
             <span>View Details</span>
@@ -795,6 +1105,257 @@ const AdminDashboard = () => {
       </div>
       )}
 
+      {/* Payments History Section */}
+      {activeSection === 'payments' && (
+        <div className="card p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">💳 Payments History (Pay to Admin)</h2>
+            <button
+              onClick={() => {
+                // Export to Excel
+                const excelData = allPayments.map((payment) => ({
+                  'Date': new Date(payment.date).toLocaleDateString('en-IN'),
+                  'User Name': payment.userName || 'Unknown',
+                  'User Email': payment.userEmail || 'N/A',
+                  'Mobile Number': payment.userMobileNumber || 'N/A',
+                  'Online Amount (₹)': parseFloat(payment.money_online || 0).toFixed(2),
+                  'Offline Amount (₹)': parseFloat(payment.money_offline || 0).toFixed(2),
+                  'Total Amount (₹)': parseFloat(payment.total_amount || 0).toFixed(2),
+                }));
+
+                const worksheet = XLSX.utils.json_to_sheet(excelData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Payments History');
+
+                const dateStr = new Date().toISOString().split('T')[0];
+                const filename = `Payments_History_${dateStr}.xlsx`;
+                XLSX.writeFile(workbook, filename);
+                toast.success('Payments exported to Excel successfully!');
+              }}
+              className="btn-primary text-sm sm:text-base whitespace-nowrap"
+              disabled={allPayments.length === 0}
+            >
+              📥 Export to Excel
+            </button>
+          </div>
+
+          {paymentsLoading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Loading payments...</p>
+            </div>
+          ) : allPayments.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No payments found.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Name</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Email</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Mobile</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Online (₹)</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offline (₹)</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {allPayments.map((payment) => {
+                    const onlineAmount = parseFloat(payment.money_online || 0);
+                    const offlineAmount = parseFloat(payment.money_offline || 0);
+                    const total = parseFloat(payment.total_amount || 0);
+                    
+                    return (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(payment.date).toLocaleDateString('en-IN', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {payment.userName || 'Unknown'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                          {payment.userEmail || 'N/A'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                          {payment.userMobileNumber || 'N/A'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-right">
+                          {onlineAmount > 0 ? (
+                            <span className="text-blue-600 font-medium">
+                              ₹{onlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-right">
+                          {offlineAmount > 0 ? (
+                            <span className="text-orange-600 font-medium">
+                              ₹{offlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
+                          ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* User Approvals Section */}
+      {activeSection === 'approvals' && (
+        <div className="card p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">✅ User Approvals</h2>
+          
+          {(() => {
+            const pendingUsers = users.filter(u => u.approvalStatus === 'pending');
+            const rejectedUsers = users.filter(u => u.approvalStatus === 'rejected');
+            
+            if (pendingUsers.length === 0 && rejectedUsers.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">No pending or rejected users</p>
+                  <p className="text-gray-400 text-sm mt-2">All users have been approved</p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-6">
+                {/* Pending Users */}
+                {pendingUsers.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-bold">
+                        {pendingUsers.length}
+                      </span>
+                      Pending Approval
+                    </h3>
+                    <div className="space-y-3">
+                      {pendingUsers.map((user) => (
+                        <div key={user.id} className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <img
+                                src={user.photo}
+                                alt={user.name}
+                                className="w-12 h-12 rounded-full flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-gray-900 truncate">{user.name}</p>
+                                <p className="text-sm text-gray-600 truncate">{user.email || 'No email'}</p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {user.city && (
+                                    <span className="text-xs text-gray-500">📍 {user.city}</span>
+                                  )}
+                                  {user.other && (
+                                    <span className="text-xs text-gray-500">🏛️ {user.other}</span>
+                                  )}
+                                  {user.mobileNumber && (
+                                    <span className="text-xs text-gray-500">📱 {user.mobileNumber}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => {
+                                  setUserToApprove(user);
+                                  setShowApproveUserModal(true);
+                                }}
+                                disabled={loading}
+                                className="btn-primary bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 disabled:opacity-50"
+                              >
+                                ✅ Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setUserToReject(user);
+                                  setShowRejectUserModal(true);
+                                }}
+                                disabled={loading}
+                                className="btn-secondary bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 disabled:opacity-50"
+                              >
+                                ❌ Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rejected Users */}
+                {rejectedUsers.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-bold">
+                        {rejectedUsers.length}
+                      </span>
+                      Rejected Users
+                    </h3>
+                    <div className="space-y-3">
+                      {rejectedUsers.map((user) => (
+                        <div key={user.id} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <img
+                                src={user.photo}
+                                alt={user.name}
+                                className="w-12 h-12 rounded-full flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-gray-900 truncate">{user.name}</p>
+                                <p className="text-sm text-gray-600 truncate">{user.email || 'No email'}</p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {user.city && (
+                                    <span className="text-xs text-gray-500">📍 {user.city}</span>
+                                  )}
+                                  {user.other && (
+                                    <span className="text-xs text-gray-500">🏛️ {user.other}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => {
+                                  setUserToApprove(user);
+                                  setShowApproveUserModal(true);
+                                }}
+                                disabled={loading}
+                                className="btn-primary bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 disabled:opacity-50"
+                              >
+                                ✅ Approve
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Users Table */}
       {activeSection === 'users' && (
       <div className="card p-4 sm:p-6">
@@ -827,21 +1388,26 @@ const AdminDashboard = () => {
                     }, 0);
                     return (
                       <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
                           <div className="flex items-center">
                             <img
                               src={user.photo}
                               alt={user.name}
                               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-2 sm:mr-3 flex-shrink-0"
                             />
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm sm:text-base text-gray-900 truncate max-w-[120px] sm:max-w-none">
-                                {user.name}
-                              </span>
-                              {user.isAdmin && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-600 text-white">
-                                  Admin
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm sm:text-base text-gray-900 truncate max-w-[120px] sm:max-w-none">
+                                  {user.name}
                                 </span>
+                                {user.isAdmin && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-600 text-white">
+                                    Admin
+                                  </span>
+                                )}
+                              </div>
+                              {user.email && (
+                                <p className="text-xs text-gray-500 truncate mt-0.5">📧 {user.email}</p>
                               )}
                             </div>
                           </div>
@@ -853,7 +1419,14 @@ const AdminDashboard = () => {
                           {totalBooks}
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-gray-900 text-sm sm:text-base hidden md:table-cell">
-                          ₹{user.totalMoney.toLocaleString()}
+                          {(() => {
+                            // Calculate total money from activities
+                            const activities = user.activities || [];
+                            const totalMoney = activities.reduce((sum, activity) => {
+                              return sum + (activity.moneyOnline || 0) + (activity.moneyOffline || 0);
+                            }, 0);
+                            return `₹${totalMoney.toLocaleString()}`;
+                          })()}
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
                           <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -1037,7 +1610,7 @@ const AdminDashboard = () => {
                           <span className="font-semibold text-gray-900">₹{offlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                          <span className="font-medium text-gray-700">Total Money Received:</span>
+                          <span className="font-medium text-gray-700">Money Collected:</span>
                           <span className="font-bold text-gray-900">₹{totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -1064,29 +1637,11 @@ const AdminDashboard = () => {
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-yellow-200">
                     <button
                       type="button"
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        try {
-                          // Ensure we stay on approvals section
-                          setActiveSection('approvals');
-                          await approveActivity(activity.id);
-                          toast.success('Activity approved successfully');
-                          // Reload pending activities
-                          const updatedActivities = await loadPendingActivities();
-                          setPendingActivities(updatedActivities || []);
-                          // Refresh store without navigation
-                          const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
-                          if (currentAuthUser) {
-                            await useStore.getState().initialize(currentAuthUser);
-                          } else {
-                            await useStore.getState().initialize();
-                          }
-                          // Ensure we stay on approvals section after refresh
-                          setActiveSection('approvals');
-                        } catch (error) {
-                          toast.error('Failed to approve activity: ' + error.message);
-                        }
+                        setActivityToApprove(activity);
+                        setShowApproveActivityModal(true);
                       }}
                       className="btn-primary flex-1 text-sm sm:text-base px-4 py-2.5"
                     >
@@ -1094,22 +1649,11 @@ const AdminDashboard = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        try {
-                          // Ensure we stay on approvals section
-                          setActiveSection('approvals');
-                          await rejectActivity(activity.id);
-                          toast.success('Activity rejected');
-                          // Reload pending activities
-                          const updatedActivities = await loadPendingActivities();
-                          setPendingActivities(updatedActivities || []);
-                          // Ensure we stay on approvals section after refresh
-                          setActiveSection('approvals');
-                        } catch (error) {
-                          toast.error('Failed to reject activity: ' + error.message);
-                        }
+                        setActivityToReject(activity);
+                        setShowRejectActivityModal(true);
                       }}
                       className="btn-secondary flex-1 text-sm sm:text-base px-4 py-2.5 bg-red-50 text-red-700 hover:bg-red-100 border-red-300"
                     >
@@ -1128,6 +1672,71 @@ const AdminDashboard = () => {
       <div className="card p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">⚙️ System Settings</h2>
         <div className="space-y-4">
+          {/* Admin Approval Toggle */}
+          <div className="border border-gray-200 rounded-lg p-4 sm:p-6 bg-white">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800 mb-1 text-lg">Admin Approval Required</h3>
+                <p className="text-sm text-gray-600">
+                  {requireAdminApproval 
+                    ? 'New users need admin approval before they can login.'
+                    : 'New users can login immediately after signup without approval.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-medium ${requireAdminApproval ? 'text-gray-500' : 'text-green-600'}`}>
+                  OFF
+                </span>
+                <button
+                  onClick={async () => {
+                    const newValue = !requireAdminApproval;
+                    setConfigLoading(true);
+                    try {
+                      await updateAppConfig('require_admin_approval', newValue ? 'true' : 'false');
+                      setRequireAdminApproval(newValue);
+                      toast.success(
+                        newValue 
+                          ? 'Admin approval is now required for new users'
+                          : 'Users can now login immediately after signup',
+                        {
+                          position: "top-right",
+                          autoClose: 3000,
+                        }
+                      );
+                    } catch (error) {
+                      toast.error(`Error updating setting: ${error.message}`, {
+                        position: "top-right",
+                        autoClose: 4000,
+                      });
+                    } finally {
+                      setConfigLoading(false);
+                    }
+                  }}
+                  disabled={configLoading}
+                  className={`relative inline-flex h-8 w-14 sm:h-10 sm:w-18 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-spiritual-500 focus:ring-offset-2 ${
+                    requireAdminApproval ? 'bg-green-600' : 'bg-gray-300'
+                  } ${configLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 sm:h-8 sm:w-8 transform rounded-full bg-white transition-transform ${
+                      requireAdminApproval ? 'translate-x-7 sm:translate-x-9' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className={`text-sm font-medium ${requireAdminApproval ? 'text-green-600' : 'text-gray-500'}`}>
+                  ON
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-800">
+                <strong>Note:</strong> {requireAdminApproval 
+                  ? 'When ON, new signups will be pending until you approve them in the "User Approvals" section.'
+                  : 'When OFF, new users are automatically approved and can login immediately.'}
+              </p>
+            </div>
+          </div>
+
           <div className="border border-gray-200 rounded-lg p-4">
             <h3 className="font-semibold text-gray-800 mb-2">Database Information</h3>
             <p className="text-sm text-gray-600">Total Users: {users.length}</p>
@@ -1144,10 +1753,6 @@ const AdminDashboard = () => {
                            (u.otherBooks || 0);
               return total > 0;
             }).length}</p>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-2">Coming Soon</h3>
-            <p className="text-sm text-gray-600">More settings and configuration options will be available here.</p>
           </div>
         </div>
       </div>
@@ -1668,6 +2273,358 @@ const AdminDashboard = () => {
         </div>
       )}
 
+      {/* Sadhna Management Section */}
+      {activeSection === 'sadhna' && (
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">🕉️ All Users Sadhna</h2>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={loadAllSadhna}
+              disabled={sadhnaLoading}
+              className="btn-secondary text-sm"
+            >
+              {sadhnaLoading ? 'Loading...' : '🔄 Refresh'}
+            </button>
+          </div>
+        </div>
+
+        {/* Search and Filter Section */}
+        {allSadhna.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="sm:col-span-2">
+              <input
+                type="text"
+                placeholder="🔍 Search by name or email..."
+                value={sadhnaSearchQuery}
+                onChange={(e) => {
+                  setSadhnaSearchQuery(e.target.value);
+                  setSadhnaCurrentPage(1); // Reset to first page on search
+                }}
+                className="input-field text-sm"
+              />
+            </div>
+            <div>
+              <input
+                type="date"
+                value={sadhnaDateFilter}
+                onChange={(e) => {
+                  setSadhnaDateFilter(e.target.value);
+                  setSadhnaCurrentPage(1); // Reset to first page on filter
+                }}
+                className="input-field text-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Filter and Pagination Info */}
+        {(() => {
+          // Filter sadhna entries
+          const filteredSadhna = allSadhna.filter((sadhna) => {
+            const matchesSearch = !sadhnaSearchQuery || 
+              (sadhna.userName && sadhna.userName.toLowerCase().includes(sadhnaSearchQuery.toLowerCase())) ||
+              (sadhna.userEmail && sadhna.userEmail.toLowerCase().includes(sadhnaSearchQuery.toLowerCase()));
+            const matchesDate = !sadhnaDateFilter || 
+              (sadhna.date && new Date(sadhna.date).toISOString().split('T')[0] === sadhnaDateFilter);
+            return matchesSearch && matchesDate;
+          });
+
+          // Pagination
+          const totalPages = Math.ceil(filteredSadhna.length / sadhnaItemsPerPage);
+          const startIndex = (sadhnaCurrentPage - 1) * sadhnaItemsPerPage;
+          const endIndex = startIndex + sadhnaItemsPerPage;
+          const paginatedSadhna = filteredSadhna.slice(startIndex, endIndex);
+
+          return (
+            <>
+              {/* Results Count and Items Per Page */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{startIndex + 1}</span> - <span className="font-semibold">{Math.min(endIndex, filteredSadhna.length)}</span> of <span className="font-semibold">{filteredSadhna.length}</span> entries
+                  {sadhnaSearchQuery && (
+                    <span className="ml-2 text-gray-500">
+                      (filtered from {allSadhna.length} total)
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">Items per page:</label>
+                  <select
+                    value={sadhnaItemsPerPage}
+                    onChange={(e) => {
+                      setSadhnaItemsPerPage(Number(e.target.value));
+                      setSadhnaCurrentPage(1);
+                    }}
+                    className="input-field text-sm w-20"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Export Buttons */}
+              {filteredSadhna.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    onClick={() => {
+                      if (selectedSadhnaIds.length === 0) {
+                        toast.info('Please select at least one entry to export');
+                        return;
+                      }
+                      exportSadhnaToExcel(selectedSadhnaIds);
+                    }}
+                    disabled={sadhnaLoading || selectedSadhnaIds.length === 0}
+                    className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    📥 Export Selected ({selectedSadhnaIds.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      const filteredIds = filteredSadhna.map(s => s.id);
+                      exportSadhnaToExcel(filteredIds);
+                    }}
+                    disabled={sadhnaLoading || filteredSadhna.length === 0}
+                    className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    📥 Export Filtered ({filteredSadhna.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      const allIds = allSadhna.map(s => s.id);
+                      exportSadhnaToExcel(allIds);
+                    }}
+                    disabled={sadhnaLoading || allSadhna.length === 0}
+                    className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    📥 Export All ({allSadhna.length})
+                  </button>
+                  {filteredSadhna.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (selectedSadhnaIds.length === filteredSadhna.length) {
+                          setSelectedSadhnaIds([]);
+                        } else {
+                          setSelectedSadhnaIds(filteredSadhna.map(s => s.id));
+                        }
+                      }}
+                      disabled={sadhnaLoading}
+                      className="btn-secondary text-sm whitespace-nowrap"
+                    >
+                      {selectedSadhnaIds.length === filteredSadhna.length ? '☐ Deselect All' : '☑ Select All'}
+                    </button>
+                  )}
+                </div>
+              )}
+        
+              {sadhnaLoading ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400">Loading sadhna data...</p>
+                </div>
+              ) : filteredSadhna.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400 text-lg">No sadhna entries found</p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    {sadhnaSearchQuery || sadhnaDateFilter 
+                      ? 'Try adjusting your search or filter criteria'
+                      : 'Users haven\'t submitted their sadhna yet'}
+                  </p>
+                  {(sadhnaSearchQuery || sadhnaDateFilter) && (
+                    <button
+                      onClick={() => {
+                        setSadhnaSearchQuery('');
+                        setSadhnaDateFilter('');
+                      }}
+                      className="btn-secondary text-sm mt-3"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    {paginatedSadhna.map((sadhna) => (
+              <div key={sadhna.id} className="border border-gray-200 rounded-xl p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedSadhnaIds.includes(sadhna.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSadhnaIds([...selectedSadhnaIds, sadhna.id]);
+                        } else {
+                          setSelectedSadhnaIds(selectedSadhnaIds.filter(id => id !== sadhna.id));
+                        }
+                      }}
+                      className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0 mt-1"
+                    />
+                    <img
+                      src={sadhna.userPhoto}
+                      alt={sadhna.userName}
+                      className="w-12 h-12 rounded-full border-2 border-gray-200 flex-shrink-0 object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-semibold text-gray-900 truncate">{sadhna.userName}</h3>
+                      <p className="text-xs text-gray-600 truncate">{sadhna.userEmail}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(sadhna.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                  {/* Wake Up Time */}
+                  <div className={`rounded-lg p-3 ${sadhna.wakeUpTime ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1">🌅 Wake Up Time</p>
+                    {sadhna.wakeUpTime ? (
+                      <p className="text-sm font-semibold text-green-700">{sadhna.wakeUpTime}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not recorded</p>
+                    )}
+                  </div>
+
+                  {/* Arti & Puja */}
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs text-gray-600 mb-2 font-medium">Arti & Puja</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Mangla Arti</span>
+                        {sadhna.manglaArti ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Tulsi Arti</span>
+                        {sadhna.tulsiArti ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Guru Puja</span>
+                        {sadhna.guruPuja ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-700">Sandhya Arti</span>
+                        {sadhna.sandhyaArti ? (
+                          <span className="text-xs font-semibold text-green-600">✓ Yes</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">✗ No</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Japa Rounds */}
+                  <div className={`rounded-lg p-3 ${(sadhna.firstRoundTiming || sadhna.lastRoundTiming || sadhna.totalRounds > 0) ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-2 font-medium">Japa Rounds</p>
+                    {sadhna.firstRoundTiming || sadhna.lastRoundTiming || sadhna.totalRounds > 0 ? (
+                      <div className="space-y-1">
+                        {sadhna.firstRoundTiming && <p className="text-xs text-gray-700">First: <span className="font-semibold text-green-700">{sadhna.firstRoundTiming}</span></p>}
+                        {sadhna.lastRoundTiming && <p className="text-xs text-gray-700">Last: <span className="font-semibold text-green-700">{sadhna.lastRoundTiming}</span></p>}
+                        {sadhna.totalRounds > 0 && <p className="text-xs font-semibold text-green-700">Total: {sadhna.totalRounds}</p>}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not recorded</p>
+                    )}
+                  </div>
+
+                  {/* Lecture Hearing */}
+                  <div className={`rounded-lg p-3 ${sadhna.lectureHearing ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1 font-medium">📚 Lecture Hearing</p>
+                    {sadhna.lectureHearing ? (
+                      <p className="text-sm text-gray-900 break-words">{sadhna.lectureHearing}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not done</p>
+                    )}
+                  </div>
+
+                  {/* Book Reading */}
+                  <div className={`rounded-lg p-3 ${sadhna.bookReading ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1 font-medium">📖 Book Reading</p>
+                    {sadhna.bookReading ? (
+                      <p className="text-sm text-gray-900 break-words">{sadhna.bookReading}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not done</p>
+                    )}
+                  </div>
+
+                  {/* Services Done */}
+                  <div className={`rounded-lg p-3 sm:col-span-2 lg:col-span-3 ${sadhna.servicesDone ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className="text-xs text-gray-600 mb-1 font-medium">🛎️ Services Done</p>
+                    {sadhna.servicesDone ? (
+                      <p className="text-sm text-gray-900 break-words">{sadhna.servicesDone}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No services recorded</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-200">
+                      <div className="text-sm text-gray-600">
+                        Page <span className="font-semibold">{sadhnaCurrentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSadhnaCurrentPage(1)}
+                          disabled={sadhnaCurrentPage === 1}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          « First
+                        </button>
+                        <button
+                          onClick={() => setSadhnaCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={sadhnaCurrentPage === 1}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          ‹ Prev
+                        </button>
+                        <span className="text-sm text-gray-600 px-3">
+                          {sadhnaCurrentPage} / {totalPages}
+                        </span>
+                        <button
+                          onClick={() => setSadhnaCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={sadhnaCurrentPage === totalPages}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next ›
+                        </button>
+                        <button
+                          onClick={() => setSadhnaCurrentPage(totalPages)}
+                          disabled={sadhnaCurrentPage === totalPages}
+                          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Last »
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          );
+        })()}
+      </div>
+      )}
+
       {/* Delete Book Confirmation Modal */}
       {showDeleteBookModal && bookToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1698,6 +2655,292 @@ const AdminDashboard = () => {
                   setShowDeleteBookModal(false);
                   setBookToDelete(null);
                 }}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve User Confirmation Modal */}
+      {showApproveUserModal && userToApprove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">✅</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Approve User?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+              Are you sure you want to approve <span className="font-semibold text-gray-800">{userToApprove.name}</span>?
+            </p>
+            <p className="text-xs sm:text-sm text-green-600 text-center mb-6 bg-green-50 border border-green-200 rounded-lg p-3">
+              ✅ After approval, this user will be able to login and access the application.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    await approveUser(userToApprove.id);
+                    toast.success(`${userToApprove.name} has been approved!`, {
+                      position: "top-right",
+                      autoClose: 3000,
+                    });
+                    setShowApproveUserModal(false);
+                    setUserToApprove(null);
+                    // Reload users to refresh the list
+                    const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
+                    if (currentAuthUser) {
+                      await useStore.getState().initialize(currentAuthUser);
+                    } else {
+                      await useStore.getState().initialize();
+                    }
+                  } catch (err) {
+                    toast.error(`Error: ${err.message}`, {
+                      position: "top-right",
+                      autoClose: 4000,
+                    });
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-green-600 hover:bg-green-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Approving...' : 'Yes, Approve User'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowApproveUserModal(false);
+                  setUserToApprove(null);
+                }}
+                disabled={loading}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Activity Confirmation Modal */}
+      {showApproveActivityModal && activityToApprove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">✅</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Approve Activity?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-4">
+              Are you sure you want to approve this activity?
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
+              <p className="text-xs sm:text-sm text-gray-700">
+                <span className="font-semibold">User:</span> {activityToApprove.user?.name || 'Unknown'}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-700 mt-1">
+                <span className="font-semibold">Date:</span> {new Date(activityToApprove.date).toLocaleDateString()}
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-green-600 text-center mb-6 bg-green-50 border border-green-200 rounded-lg p-3">
+              ✅ After approval, this activity will be visible to the user and included in their statistics.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    setLoading(true);
+                    // Ensure we stay on approvals section
+                    setActiveSection('approvals');
+                    await approveActivity(activityToApprove.id);
+                    toast.success('Activity approved successfully');
+                    // Reload pending activities
+                    const updatedActivities = await loadPendingActivities();
+                    setPendingActivities(updatedActivities || []);
+                    // Refresh store without navigation
+                    const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
+                    if (currentAuthUser) {
+                      await useStore.getState().initialize(currentAuthUser);
+                    } else {
+                      await useStore.getState().initialize();
+                    }
+                    // Ensure we stay on approvals section after refresh
+                    setActiveSection('approvals');
+                    setShowApproveActivityModal(false);
+                    setActivityToApprove(null);
+                  } catch (error) {
+                    toast.error('Failed to approve activity: ' + error.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-green-600 hover:bg-green-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Approving...' : 'Yes, Approve Activity'}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowApproveActivityModal(false);
+                  setActivityToApprove(null);
+                }}
+                disabled={loading}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject User Confirmation Modal */}
+      {showRejectUserModal && userToReject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">❌</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Reject & Delete User?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+              Are you sure you want to reject and delete <span className="font-semibold text-gray-800">{userToReject.name}</span>?
+            </p>
+            <p className="text-xs sm:text-sm text-red-600 text-center mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
+              ⚠️ This action cannot be undone. All user data including profile, activities, payments, and sadhna will be permanently deleted from the database. The user will need to signup again if they want to try again.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    await rejectUser(userToReject.id);
+                    toast.success(`${userToReject.name} has been rejected and deleted.`, {
+                      position: "top-right",
+                      autoClose: 3000,
+                    });
+                    setShowRejectUserModal(false);
+                    setUserToReject(null);
+                    // Reload users to refresh the list - wait a bit for DB to sync
+                    setTimeout(async () => {
+                      const currentAuthUser = useStore.getState().currentUserProfile?.auth_user_id;
+                      if (currentAuthUser) {
+                        await useStore.getState().initialize(currentAuthUser);
+                      } else {
+                        await useStore.getState().initialize();
+                      }
+                    }, 500);
+                  } catch (err) {
+                    console.error('Reject user error:', err);
+                    toast.error(`Error: ${err.message}. Please check if DELETE policy is set in database.`, {
+                      position: "top-right",
+                      autoClose: 5000,
+                    });
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-red-600 hover:bg-red-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Deleting...' : 'Yes, Delete User'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowRejectUserModal(false);
+                  setUserToReject(null);
+                }}
+                disabled={loading}
+                className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Activity Confirmation Modal */}
+      {showRejectActivityModal && activityToReject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <span className="text-3xl">❌</span>
+              </div>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-2">
+              Reject Activity?
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-4">
+              Are you sure you want to reject this activity?
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6">
+              <p className="text-xs sm:text-sm text-gray-700">
+                <span className="font-semibold">User:</span> {activityToReject.user?.name || 'Unknown'}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-700 mt-1">
+                <span className="font-semibold">Date:</span> {new Date(activityToReject.date).toLocaleDateString()}
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-red-600 text-center mb-6 bg-red-50 border border-red-200 rounded-lg p-3">
+              ❌ After rejection, this activity will not be visible to the user and will not be included in their statistics.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    setLoading(true);
+                    // Ensure we stay on approvals section
+                    setActiveSection('approvals');
+                    await rejectActivity(activityToReject.id);
+                    toast.success('Activity rejected');
+                    // Reload pending activities
+                    const updatedActivities = await loadPendingActivities();
+                    setPendingActivities(updatedActivities || []);
+                    // Ensure we stay on approvals section after refresh
+                    setActiveSection('approvals');
+                    setShowRejectActivityModal(false);
+                    setActivityToReject(null);
+                  } catch (error) {
+                    toast.error('Failed to reject activity: ' + error.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="btn-primary bg-red-600 hover:bg-red-700 text-white flex-1 text-sm sm:text-base py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Rejecting...' : 'Yes, Reject Activity'}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowRejectActivityModal(false);
+                  setActivityToReject(null);
+                }}
+                disabled={loading}
                 className="btn-secondary flex-1 text-sm sm:text-base py-2.5"
               >
                 Cancel

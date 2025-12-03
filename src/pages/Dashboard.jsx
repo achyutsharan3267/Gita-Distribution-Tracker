@@ -49,10 +49,14 @@ const Dashboard = () => {
   const loadBooks = useStore((state) => state.loadBooks);
   const initialize = useStore((state) => state.initialize);
   const currentUserProfile = useStore((state) => state.currentUserProfile);
+  const getSadhnaForDate = useStore((state) => state.getSadhnaForDate);
   const { user: authUser } = useAuth();
   const navigate = useNavigate();
 
   const [currentQuote, setCurrentQuote] = useState(quotes[0]);
+  const [isSadhnaPending, setIsSadhnaPending] = useState(false);
+  const [checkingSadhna, setCheckingSadhna] = useState(true);
+  const [todaySadhna, setTodaySadhna] = useState(null);
 
   // Rotate quotes every 10 seconds
   useEffect(() => {
@@ -68,6 +72,31 @@ const Dashboard = () => {
   useEffect(() => {
     loadBooks();
   }, [loadBooks]);
+
+  // Check if today's sadhna is pending
+  useEffect(() => {
+    const checkTodaySadhna = async () => {
+      if (!currentUserProfile) {
+        setCheckingSadhna(false);
+        return;
+      }
+
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const sadhna = await getSadhnaForDate(currentUserProfile.id, today);
+        setTodaySadhna(sadhna);
+        setIsSadhnaPending(!sadhna);
+      } catch (error) {
+        console.error('Error checking sadhna:', error);
+        setIsSadhnaPending(false);
+        setTodaySadhna(null);
+      } finally {
+        setCheckingSadhna(false);
+      }
+    };
+
+    checkTodaySadhna();
+  }, [currentUserProfile, getSadhnaForDate]);
 
   // Filter out users with 0 total books
   const activeLeaderboard = leaderboard.filter((user) => user.totalDistributed > 0);
@@ -109,6 +138,148 @@ const Dashboard = () => {
         </button>
       </div>
 
+      {/* Today's Sadhna Status */}
+      {!checkingSadhna && currentUserProfile && (
+        <>
+          {/* Pending Notification */}
+          {isSadhnaPending && (
+            <div className="tour-sadhna-status card p-4 sm:p-5 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300">
+              <div className="flex items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="text-3xl">⏳</div>
+                  <div className="flex-1">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
+                      Today's Sadhna Pending
+                    </h3>
+                    <p className="text-sm text-gray-700 mb-3">
+                      You haven't submitted your daily sadhna for today. Please fill it out to track your spiritual practices.
+                    </p>
+                    <Link
+                      to="/sadhna"
+                      className="inline-flex items-center gap-2 btn-primary text-sm px-4 py-2"
+                    >
+                      <span>🕉️</span>
+                      <span>Submit Today's Sadhna</span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Completed Sadhna - Rounds Count */}
+          {!isSadhnaPending && todaySadhna && todaySadhna.totalRounds > 0 && (() => {
+            const targetRounds = 16;
+            const completedRounds = todaySadhna.totalRounds;
+            const percentage = Math.min((completedRounds / targetRounds) * 100, 100);
+            const isExceeded = completedRounds > targetRounds;
+            
+            // Color based on percentage
+            let bgGradient = '';
+            let borderColor = '';
+            let textColor = '';
+            let progressColor = '';
+            
+            if (percentage < 25) {
+              bgGradient = 'from-red-50 to-orange-50';
+              borderColor = 'border-red-300';
+              textColor = 'text-red-700';
+              progressColor = 'bg-red-500';
+            } else if (percentage < 50) {
+              bgGradient = 'from-orange-50 to-yellow-50';
+              borderColor = 'border-orange-300';
+              textColor = 'text-orange-700';
+              progressColor = 'bg-orange-500';
+            } else if (percentage < 75) {
+              bgGradient = 'from-yellow-50 to-green-50';
+              borderColor = 'border-yellow-300';
+              textColor = 'text-yellow-700';
+              progressColor = 'bg-yellow-500';
+            } else if (percentage < 100) {
+              bgGradient = 'from-green-50 to-emerald-50';
+              borderColor = 'border-green-300';
+              textColor = 'text-green-700';
+              progressColor = 'bg-green-500';
+            } else {
+              bgGradient = 'from-emerald-50 to-teal-50';
+              borderColor = 'border-emerald-400';
+              textColor = 'text-emerald-700';
+              progressColor = 'bg-emerald-500';
+            }
+            
+            return (
+              <div className={`tour-sadhna-status card p-4 sm:p-5 bg-gradient-to-r ${bgGradient} border-2 ${borderColor} relative overflow-hidden`}>
+                {isExceeded && (
+                  <div className="absolute top-2 right-2">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-lg animate-pulse">
+                      <span>⭐</span>
+                      <span>Exceeded Target!</span>
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="text-3xl">📿</div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
+                        Today's Japa Rounds
+                      </h3>
+                      <p className="text-sm text-gray-700">
+                        {isExceeded 
+                          ? `Amazing! You've exceeded the daily target of ${targetRounds} rounds! 🙏`
+                          : `You've completed your sadhna for today`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-3xl sm:text-4xl font-bold ${textColor}`}>
+                      {completedRounds}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      / {targetRounds} Rounds
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {Math.round(percentage)}% Complete
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="mb-3">
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className={`h-full ${progressColor} transition-all duration-500 ease-out rounded-full flex items-center justify-end pr-1`}
+                      style={{ width: `${Math.min(percentage, 100)}%` }}
+                    >
+                      {percentage >= 50 && (
+                        <span className="text-white text-xs font-bold">✓</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {(todaySadhna.firstRoundTiming || todaySadhna.lastRoundTiming) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-4 text-sm">
+                    {todaySadhna.firstRoundTiming && (
+                      <div>
+                        <span className="text-gray-600">First Round:</span>
+                        <span className="font-semibold text-gray-900 ml-2">{todaySadhna.firstRoundTiming}</span>
+                      </div>
+                    )}
+                    {todaySadhna.lastRoundTiming && (
+                      <div>
+                        <span className="text-gray-600">Last Round:</span>
+                        <span className="font-semibold text-gray-900 ml-2">{todaySadhna.lastRoundTiming}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </>
+      )}
+
       {/* User's Personal Stats - Only if logged in */}
       {currentUserProfile && (() => {
         // Calculate Amount as per Books based on user's total books
@@ -120,18 +291,31 @@ const Dashboard = () => {
           amountAsPerBooks += count * price;
         });
 
-        // Calculate Insufficient Funds (if Amount as per Books > Total Money Collected)
-        const insufficientFunds = amountAsPerBooks > currentUserProfile.totalMoney 
-          ? amountAsPerBooks - currentUserProfile.totalMoney 
+        // Calculate Money Collected from all activities (sum of money_online + money_offline)
+        // If activities are deleted, this will be 0
+        const activities = currentUserProfile.activities || [];
+        const totalOnlineAmount = activities.reduce((sum, activity) => {
+          return sum + (activity.moneyOnline || 0);
+        }, 0);
+        
+        const totalOfflineAmount = activities.reduce((sum, activity) => {
+          return sum + (activity.moneyOffline || 0);
+        }, 0);
+        
+        const moneyCollected = totalOnlineAmount + totalOfflineAmount;
+
+        // Calculate Insufficient Funds (if Amount as per Books > Money Collected)
+        const insufficientFunds = amountAsPerBooks > moneyCollected 
+          ? amountAsPerBooks - moneyCollected 
           : 0;
 
-        // Calculate Donation Amount (if Total Money Collected > Amount as per Books)
-        const donationAmount = currentUserProfile.totalMoney > amountAsPerBooks 
-          ? currentUserProfile.totalMoney - amountAsPerBooks 
+        // Calculate Donation Amount (if Money Collected > Amount as per Books)
+        const donationAmount = moneyCollected > amountAsPerBooks 
+          ? moneyCollected - amountAsPerBooks 
           : 0;
 
         return (
-          <div className="card p-4 sm:p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
+          <div className="tour-your-contribution card p-4 sm:p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900">Your Contribution</h2>
               <span className="text-2xl">🙏</span>
@@ -157,7 +341,7 @@ const Dashboard = () => {
                     <p className="text-xs text-gray-600 font-medium">Money Collected</p>
                   </div>
                   <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
-                    ₹{currentUserProfile.totalMoney.toLocaleString()}
+                    ₹{moneyCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Total collected</p>
                 </div>
@@ -199,6 +383,33 @@ const Dashboard = () => {
                     </p>
                   </div>
                 )}
+              </div>
+              
+              {/* Online and Offline Payment Details */}
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">💳</span>
+                    <p className="text-xs text-blue-600 font-medium">Online received Amount</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600 break-words">
+                    ₹{totalOnlineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-blue-500 mt-1">Digital payments</p>
+                </div>
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 sm:p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">💵</span>
+                    <p className="text-xs text-orange-600 font-medium">Offline received Amount</p>
+                  </div>
+                  <p className="text-xl sm:text-2xl font-bold text-orange-600 break-words">
+                    ₹{totalOfflineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-orange-500 mt-1">Cash payments</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <div className="bg-white/60 rounded-xl p-3 sm:p-4 hover:bg-white/80 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-xl">🏆</span>
@@ -246,7 +457,7 @@ const Dashboard = () => {
         {/* Active Books Card - Clickable */}
         <div 
           onClick={() => navigate('/books-prices')}
-          className="card p-5 cursor-pointer active:scale-[0.98] transition-all duration-200 hover:shadow-md"
+          className="tour-active-books card p-5 cursor-pointer active:scale-[0.98] transition-all duration-200 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -357,7 +568,7 @@ const Dashboard = () => {
       </div>
 
       {/* Inspirational Quote Section */}
-      <div className="card p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
+      <div className="tour-quotes card p-5 bg-gradient-to-br from-primary-50 to-sage-50 border border-primary-100">
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0 text-3xl">📖</div>
           <div className="flex-1 min-w-0">
@@ -372,7 +583,7 @@ const Dashboard = () => {
       </div>
 
       {/* Top Distributors Section */}
-      <div className="card p-5">
+      <div className="tour-top-3 card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Top Distributors</h2>
           <span className="text-sm text-gray-500">{top3.length}</span>
@@ -425,7 +636,7 @@ const Dashboard = () => {
       </div>
 
       {/* Top 10 Leaderboard */}
-      <div className="card p-5">
+      <div className="tour-leaderboard card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Top 10 Leaderboard</h2>
           <span className="text-sm text-gray-500">{top10.length}</span>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store/useStore';
+import { toast } from 'react-toastify';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -20,7 +21,27 @@ const Login = () => {
     const { error, data } = await signIn(email, password);
 
     if (error) {
-      setError(error.message);
+      // Check if error is about pending approval
+      let errorMessage = error.message;
+      if (error.message?.includes('pending admin approval') || 
+          error.message?.includes('pending approval')) {
+        errorMessage = 'Your approval is pending. Please try after some time.';
+        toast.warning('Approval pending. Please try after some time.', {
+          position: "top-right",
+          autoClose: 5000,
+        });
+      } else if (error.message?.includes('rejected')) {
+        toast.error('Your account has been rejected. Please contact admin.', {
+          position: "top-right",
+          autoClose: 5000,
+        });
+      } else {
+        toast.error(error.message, {
+          position: "top-right",
+          autoClose: 4000,
+        });
+      }
+      setError(errorMessage);
       setLoading(false);
     } else {
       // Wait for store to initialize before redirecting

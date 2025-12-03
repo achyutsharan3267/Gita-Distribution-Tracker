@@ -234,7 +234,7 @@ const DistributionForm = () => {
           ← Back
         </button>
       </div>
-      <div className="mb-6">
+      <div className="tour-form-header mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">
           Daily Distribution Form
         </h1>
@@ -266,7 +266,7 @@ const DistributionForm = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="tour-book-inputs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {books.map((book) => {
             const bookId = book.id || book.bookId;
             // Use bookId directly as field name (works for both standard and new books)
@@ -297,7 +297,7 @@ const DistributionForm = () => {
           })}
         </div>
 
-        <div className="border-t border-gray-100 pt-5">
+        <div className="tour-money-section border-t border-gray-100 pt-5">
           <h3 className="text-base font-semibold text-gray-900 mb-4">Money Details</h3>
           
           {(() => {
@@ -342,7 +342,7 @@ const DistributionForm = () => {
                 {/* Calculated Fields */}
                 <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">Total Received Amount (₹)</span>
+                    <span className="text-sm font-medium text-gray-700">Money Collected (₹)</span>
                     <span className="text-base font-semibold text-gray-900">
                       {amounts.totalReceivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
@@ -382,7 +382,7 @@ const DistributionForm = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="tour-submit-button btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Submitting...' : '📝 Submit Distribution'}
           </button>
@@ -397,7 +397,7 @@ const DistributionForm = () => {
       </form>
 
       {/* Current Stats Preview */}
-      <div className="card mt-5 p-5">
+      <div className="tour-current-totals card mt-5 p-5">
         <h3 className="text-base font-semibold text-gray-900 mb-4">Your Current Totals</h3>
         {!currentUserProfile ? (
           <p className="text-center text-gray-400 py-4 text-sm italic">
@@ -420,7 +420,21 @@ const DistributionForm = () => {
             })}
             <div className="bg-gray-50 rounded-xl p-3 text-center">
               <p className="text-lg font-bold text-gray-900">
-                ₹{currentUserProfile.totalMoney.toLocaleString()}
+                ₹{(() => {
+                  // Calculate Money Collected from all activities (sum of money_online + money_offline)
+                  // This matches the calculation in Dashboard
+                  const activities = currentUserProfile.activities || [];
+                  const totalOnlineAmount = activities.reduce((sum, activity) => {
+                    return sum + (activity.moneyOnline || 0);
+                  }, 0);
+                  
+                  const totalOfflineAmount = activities.reduce((sum, activity) => {
+                    return sum + (activity.moneyOffline || 0);
+                  }, 0);
+                  
+                  const moneyCollected = totalOnlineAmount + totalOfflineAmount;
+                  return moneyCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                })()}
               </p>
               <p className="text-xs text-gray-500 mt-1">Total Money</p>
             </div>

@@ -18,16 +18,18 @@ const transformUser = (dbUser) => {
     name: dbUser.name,
     city: dbUser.city || null,
     mobileNumber: dbUser.mobile_number || null,
-    other: dbUser.other || null,
+    other: dbUser.bace || dbUser.other || null, // Support both 'bace' and 'other' for backward compatibility
     email: email,
     photo: dbUser.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(dbUser.name)}&background=a855f7&color=fff&size=128`,
-    hindiGita: dbUser.hindi_gita || 0,
-    englishGita: dbUser.english_gita || 0,
-    smallBooks: dbUser.small_books || 0,
-    bhagavatam: dbUser.bhagavatam || 0,
-    chaitanyaCharitamrita: dbUser.chaitanya_charitamrita || 0,
-    otherBooks: dbUser.other_books || 0,
-    totalMoney: parseFloat(dbUser.total_money || 0),
+    // Book counts will be calculated from book_distributions, not stored in users table
+    hindiGita: 0,
+    englishGita: 0,
+    smallBooks: 0,
+    bhagavatam: 0,
+    chaitanyaCharitamrita: 0,
+    otherBooks: 0,
+    totalMoney: 0, // Will be calculated from activities
+    approvalStatus: dbUser.approval_status || 'pending', // pending, approved, rejected
     activities: [], // Will be loaded separately
   };
 };
@@ -38,15 +40,11 @@ const transformUserToDb = (user) => {
     name: user.name,
     city: user.city || null,
     mobile_number: user.mobileNumber || null,
-    other: user.other || null,
-    photo: user.photo || null,
-    hindi_gita: user.hindiGita || 0,
-    english_gita: user.englishGita || 0,
-    small_books: user.smallBooks || 0,
-    bhagavatam: user.bhagavatam || 0,
-    chaitanya_charitamrita: user.chaitanyaCharitamrita || 0,
-    other_books: user.otherBooks || 0,
-    total_money: user.totalMoney || 0,
+    bace: user.other || user.bace || null, // Use 'bace' column name
+    email: user.email || null, // Store email in database
+    photo: user.photo || null, // Store photo URL (can be Supabase Storage URL or external URL)
+    // Book counts and total_money are not stored in users table
+    // They are calculated from book_distributions and activities
   };
   // Explicitly set auth_user_id to NULL so trigger can set it
   // This ensures RLS policy works correctly
@@ -58,16 +56,19 @@ const transformUserToDb = (user) => {
 const transformActivity = (dbActivity) => ({
   id: dbActivity.id,
   date: dbActivity.date,
-  hindiGita: dbActivity.hindi_gita || 0,
-  englishGita: dbActivity.english_gita || 0,
-  smallBooks: dbActivity.small_books || 0,
-  bhagavatam: dbActivity.bhagavatam || 0,
-  chaitanyaCharitamrita: dbActivity.chaitanya_charitamrita || 0,
-  otherBooks: dbActivity.other_books || 0,
+  // Book counts are now stored in book_distributions table, not in activities
+  // They will be loaded separately and attached as bookDistributions object
+  hindiGita: 0,
+  englishGita: 0,
+  smallBooks: 0,
+  bhagavatam: 0,
+  chaitanyaCharitamrita: 0,
+  otherBooks: 0,
   moneyReceived: parseFloat(dbActivity.money_received || 0),
   moneyOnline: parseFloat(dbActivity.money_online || 0),
   moneyOffline: parseFloat(dbActivity.money_offline || 0),
   approvalStatus: dbActivity.approval_status || 'approved', // pending, approved, rejected
+  bookDistributions: {}, // Will be populated from book_distributions table
 });
 
 export const useStore = create((set, get) => ({
@@ -490,6 +491,51 @@ export const useStore = create((set, get) => ({
   addUser: async (user, authUserId) => {
     try {
       const dbUser = transformUserToDb(user);
+      
+      // Check if admin approval is required
+      // IMPORTANT: First user is ALWAYS auto-approved (safety mechanism)
+      let approvalStatus = 'pending'; // Default to pending for security
+      
+      // First, check if this is the very first user (ALWAYS approve first user)
+      try {
+        const { count: userCount } = await supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true });
+        
+        // If this is the first user, ALWAYS approve regardless of config
+        if (userCount === 0) {
+          console.log('✅ First user signup - ALWAYS auto-approving for safety');
+          approvalStatus = 'approved';
+        } else {
+          // Not the first user - check config setting
+          try {
+            const requireApproval = await get().getAppConfig('require_admin_approval');
+            
+            if (requireApproval === 'false') {
+              approvalStatus = 'approved'; // Auto-approve if toggle is OFF
+              console.log('✅ Auto-approving user (approval toggle is OFF)');
+            } else if (requireApproval === 'true') {
+              // Approval is required for non-first users
+              approvalStatus = 'pending';
+              console.log('⏳ Approval required - waiting for admin approval');
+            } else {
+              // Config returned null or unexpected value, default to pending
+              approvalStatus = 'pending';
+              console.log('⏳ Config value unexpected, defaulting to pending');
+            }
+          } catch (configErr) {
+            // If config check fails, default to pending (safer)
+            approvalStatus = 'pending';
+            console.log('⏳ Could not check config, defaulting to pending:', configErr);
+          }
+        }
+      } catch (countErr) {
+        // If we can't check user count, default to pending (safer)
+        approvalStatus = 'pending';
+        console.log('⏳ Could not check user count, defaulting to pending (safer):', countErr);
+      }
+      
+      dbUser.approval_status = approvalStatus;
       // Don't set auth_user_id explicitly - let the trigger handle it
       // This ensures RLS policy works correctly
       
@@ -565,12 +611,7 @@ export const useStore = create((set, get) => ({
           {
             user_id: userId,
             date: new Date().toISOString().split('T')[0],
-            hindi_gita: distribution.hindiGita || 0,
-            english_gita: distribution.englishGita || 0,
-            small_books: distribution.smallBooks || 0,
-            bhagavatam: distribution.bhagavatam || 0,
-            chaitanya_charitamrita: distribution.chaitanyaCharitamrita || 0,
-            other_books: distribution.otherBooks || 0,
+            // Book counts are stored in book_distributions table, not here
             money_received: distribution.moneyReceived || 0,
             money_online: distribution.moneyOnline || 0,
             money_offline: distribution.moneyOffline || 0,
@@ -633,121 +674,54 @@ export const useStore = create((set, get) => ({
         }
       }
 
-      // Update user totals immediately since activity is auto-approved
-      // Reuse the user variable already declared above
-      if (user) {
-        // Calculate new totals by adding activity values
-        const newHindiGita = (user.hindiGita || 0) + (distribution.hindiGita || 0);
-        const newEnglishGita = (user.englishGita || 0) + (distribution.englishGita || 0);
-        const newSmallBooks = (user.smallBooks || 0) + (distribution.smallBooks || 0);
-        const newBhagavatam = (user.bhagavatam || 0) + (distribution.bhagavatam || 0);
-        const newChaitanyaCharitamrita = (user.chaitanyaCharitamrita || 0) + (distribution.chaitanyaCharitamrita || 0);
-        const newOtherBooks = (user.otherBooks || 0) + (distribution.otherBooks || 0);
-        const newTotalMoney = (user.totalMoney || 0) + parseFloat(distribution.moneyReceived || 0);
+      // Note: Book counts and total_money are no longer stored in users table
+      // They are calculated from book_distributions and activities tables
+      // Just reload activities to refresh the calculated values
 
-        // Update user totals in database
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            hindi_gita: newHindiGita,
-            english_gita: newEnglishGita,
-            small_books: newSmallBooks,
-            bhagavatam: newBhagavatam,
-            chaitanya_charitamrita: newChaitanyaCharitamrita,
-            other_books: newOtherBooks,
-            total_money: newTotalMoney,
-          })
-          .eq('id', userId);
+      // Reload activities with book distributions from database
+      const updatedActivities = await get().loadUserActivities(userId, false, true);
+      
+      // Update local state with reloaded activities
+      set((state) => {
+        const updatedUsers = state.users.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                activities: updatedActivities || [],
+                // Book counts are calculated from book_distributions, not stored
+                hindiGita: 0,
+                englishGita: 0,
+                smallBooks: 0,
+                bhagavatam: 0,
+                chaitanyaCharitamrita: 0,
+                otherBooks: 0,
+                totalMoney: 0, // Calculated from activities when displayed
+              }
+            : u
+        );
 
-        if (updateError) throw updateError;
+        // Update currentUserProfile if it's the same user
+        const updatedCurrentUserProfile = 
+          state.currentUserProfile?.id === userId
+            ? {
+                ...state.currentUserProfile,
+                activities: updatedActivities || [],
+                // Book counts are calculated from book_distributions, not stored
+                hindiGita: 0,
+                englishGita: 0,
+                smallBooks: 0,
+                bhagavatam: 0,
+                chaitanyaCharitamrita: 0,
+                otherBooks: 0,
+                totalMoney: 0,
+              }
+            : state.currentUserProfile;
 
-        // Get book distributions for this activity
-        const { data: bookDistributions } = await supabase
-          .from('book_distributions')
-          .select('*')
-          .eq('activity_id', activityData.id);
-
-        // Update user's bookDistributions object
-        const updatedBookDistributions = { ...(user.bookDistributions || {}) };
-        if (bookDistributions && Array.isArray(bookDistributions)) {
-          bookDistributions.forEach(bd => {
-            if (bd && bd.book_id) {
-              updatedBookDistributions[bd.book_id] = (updatedBookDistributions[bd.book_id] || 0) + (bd.count || 0);
-            }
-          });
-        }
-
-        // Reload activities with book distributions from database
-        const updatedActivities = await get().loadUserActivities(userId, false, true); // Show all statuses for own profile
-        
-        // Update local state with new totals and activities
-        set((state) => {
-          const updatedUsers = state.users.map((u) =>
-            u.id === userId
-              ? {
-                  ...u,
-                  hindiGita: newHindiGita,
-                  englishGita: newEnglishGita,
-                  smallBooks: newSmallBooks,
-                  bhagavatam: newBhagavatam,
-                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
-                  otherBooks: newOtherBooks,
-                  totalMoney: newTotalMoney,
-                  bookDistributions: updatedBookDistributions,
-                  activities: updatedActivities || [], // Use reloaded activities with book distributions
-                }
-              : u
-          );
-
-          // Update currentUserProfile if it's the same user
-          const updatedCurrentUserProfile = 
-            state.currentUserProfile?.id === userId
-              ? {
-                  ...state.currentUserProfile,
-                  hindiGita: newHindiGita,
-                  englishGita: newEnglishGita,
-                  smallBooks: newSmallBooks,
-                  bhagavatam: newBhagavatam,
-                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
-                  otherBooks: newOtherBooks,
-                  totalMoney: newTotalMoney,
-                  bookDistributions: updatedBookDistributions,
-                  activities: updatedActivities || [], // Use reloaded activities with book distributions
-                }
-              : state.currentUserProfile;
-
-          return {
-            users: updatedUsers,
-            currentUserProfile: updatedCurrentUserProfile,
-          };
-        });
-      } else {
-        // If user not found in state, just reload activities
-        const updatedActivities = await get().loadUserActivities(userId, false, true);
-        set((state) => {
-          const updatedUsers = state.users.map((u) =>
-            u.id === userId
-              ? {
-                  ...u,
-                  activities: updatedActivities || [],
-                }
-              : u
-          );
-
-          const updatedCurrentUserProfile = 
-            state.currentUserProfile?.id === userId
-              ? {
-                  ...state.currentUserProfile,
-                  activities: updatedActivities || [],
-                }
-              : state.currentUserProfile;
-
-          return {
-            users: updatedUsers,
-            currentUserProfile: updatedCurrentUserProfile,
-          };
-        });
-      }
+        return {
+          users: updatedUsers,
+          currentUserProfile: updatedCurrentUserProfile,
+        };
+      });
     } catch (error) {
       console.error('Error updating distribution:', error);
       set({ error: error.message });
@@ -774,16 +748,36 @@ export const useStore = create((set, get) => ({
   getTotalStats: () => {
     const state = get();
     const stats = state.users.reduce(
-      (acc, user) => ({
-        hindiGita: acc.hindiGita + user.hindiGita,
-        englishGita: acc.englishGita + user.englishGita,
-        smallBooks: acc.smallBooks + user.smallBooks,
-        bhagavatam: acc.bhagavatam + (user.bhagavatam || 0),
-        chaitanyaCharitamrita: acc.chaitanyaCharitamrita + (user.chaitanyaCharitamrita || 0),
-        otherBooks: acc.otherBooks + (user.otherBooks || 0),
-        totalMoney: acc.totalMoney + user.totalMoney,
-        totalUsers: state.users.length,
-      }),
+      (acc, user) => {
+        // Calculate money collected from activities instead of user.totalMoney
+        // This ensures accurate calculation even if activities are deleted
+        const userActivities = user.activities || [];
+        const userMoneyCollected = userActivities.reduce((sum, activity) => {
+          const onlineAmount = activity.moneyOnline || 0;
+          const offlineAmount = activity.moneyOffline || 0;
+          return sum + onlineAmount + offlineAmount;
+        }, 0);
+        
+        // Calculate book counts from book_distributions (not from user object)
+        const userBookCounts = {};
+        if (user.bookDistributions) {
+          Object.keys(user.bookDistributions).forEach(bookId => {
+            userBookCounts[bookId] = (userBookCounts[bookId] || 0) + (user.bookDistributions[bookId] || 0);
+          });
+        }
+        
+        return {
+          // Book counts are now aggregated from book_distributions in the next step
+          hindiGita: acc.hindiGita + (userBookCounts.hindiGita || 0),
+          englishGita: acc.englishGita + (userBookCounts.englishGita || 0),
+          smallBooks: acc.smallBooks + (userBookCounts.smallBooks || 0),
+          bhagavatam: acc.bhagavatam + (userBookCounts.bhagavatam || 0),
+          chaitanyaCharitamrita: acc.chaitanyaCharitamrita + (userBookCounts.chaitanyaCharitamrita || 0),
+          otherBooks: acc.otherBooks + (userBookCounts.otherBooks || 0),
+          totalMoney: acc.totalMoney + userMoneyCollected, // Use calculated money from activities
+          totalUsers: state.users.length,
+        };
+      },
       { hindiGita: 0, englishGita: 0, smallBooks: 0, bhagavatam: 0, chaitanyaCharitamrita: 0, otherBooks: 0, totalMoney: 0, totalUsers: 0 }
     );
     
@@ -888,9 +882,14 @@ export const useStore = create((set, get) => ({
     
     // Clean up existing subscriptions
     if (state.realtimeSubscriptions) {
+      console.log('🧹 Cleaning up existing subscriptions...');
       state.realtimeSubscriptions.users?.unsubscribe();
       state.realtimeSubscriptions.activities?.unsubscribe();
       state.realtimeSubscriptions.bookDistributions?.unsubscribe();
+      state.realtimeSubscriptions.paymentsToAdmin?.unsubscribe();
+      state.realtimeSubscriptions.sadhna?.unsubscribe();
+      state.realtimeSubscriptions.books?.unsubscribe();
+      state.realtimeSubscriptions.adminUsers?.unsubscribe();
     }
 
     console.log('🔴 Setting up real-time subscriptions...');
@@ -908,71 +907,18 @@ export const useStore = create((set, get) => ({
         async (payload) => {
           console.log('📊 Users table changed:', payload.eventType, payload.new || payload.old);
           
-          // Refresh users data
-          const { data: users, error } = await supabase
-            .from('users')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (!error && users) {
-            // Get current activities
-            const { data: activities } = await supabase
-              .from('activities')
-              .select('*')
-              .order('date', { ascending: false });
-
-            // Fetch admin status for all users
-            let adminMap = {};
-            try {
-              const { data: adminUsers } = await supabase
-                .from('admin_users')
-                .select('auth_user_id');
-              
-              if (adminUsers) {
-                adminUsers.forEach((admin) => {
-                  adminMap[admin.auth_user_id] = true;
-                });
-              }
-            } catch (err) {
-              console.log('Admin status fetch failed in real-time update');
-            }
-
-            // Group activities by user_id
-            const activitiesByUser = {};
-            activities?.forEach((activity) => {
-              if (!activitiesByUser[activity.user_id]) {
-                activitiesByUser[activity.user_id] = [];
-              }
-              activitiesByUser[activity.user_id].push(transformActivity(activity));
-            });
-
-            // Transform users with admin status
-            const transformedUsers = users.map((user) => ({
-              ...transformUser(user),
-              activities: activitiesByUser[user.id] || [],
-              isAdmin: adminMap[user.auth_user_id] || false,
-            }));
-
-            const currentState = get();
-            
-            // Update current user profile if it changed
-            let updatedCurrentUserProfile = currentState.currentUserProfile;
-            if (currentState.currentUserProfile) {
-              const updatedProfile = transformedUsers.find(
-                (u) => u.id === currentState.currentUserProfile.id
-              );
-              if (updatedProfile) {
-                updatedCurrentUserProfile = updatedProfile;
-              }
-            }
-
-            set({
-              users: transformedUsers,
-              currentUserProfile: updatedCurrentUserProfile,
-            });
-
-            console.log('✅ Users updated in real-time!');
+          // For better performance, re-initialize only if needed
+          // This ensures all related data (activities, book distributions, admin status) is refreshed
+          const currentState = get();
+          if (currentState.currentUserProfile?.auth_user_id) {
+            console.log('🔄 Re-initializing store after user change...');
+            await get().initialize(currentState.currentUserProfile.auth_user_id);
+          } else {
+            console.log('🔄 Re-initializing store after user change (no auth user)...');
+            await get().initialize();
           }
+          
+          console.log('✅ Users updated in real-time!');
         }
       )
       .subscribe();
@@ -1148,16 +1094,145 @@ export const useStore = create((set, get) => ({
       )
       .subscribe();
 
+    // Subscribe to payments_to_admin table changes
+    const paymentsToAdminSubscription = supabase
+      .channel('payments-to-admin-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments_to_admin',
+        },
+        async (payload) => {
+          console.log('💰 Payments to admin table changed:', payload.eventType);
+          
+          // Reload payments for affected user
+          if (payload.new?.user_id || payload.old?.user_id) {
+            const affectedUserId = payload.new?.user_id || payload.old?.user_id;
+            const updatedPayments = await get().loadPaymentsToAdmin(affectedUserId);
+            
+            // Update current user profile if it's the affected user
+            const currentState = get();
+            if (currentState.currentUserProfile?.id === affectedUserId) {
+              set({
+                currentUserProfile: {
+                  ...currentState.currentUserProfile,
+                  paymentsToAdmin: updatedPayments,
+                },
+              });
+            }
+            
+            console.log('✅ Payments to admin updated in real-time!');
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to sadhna table changes
+    const sadhnaSubscription = supabase
+      .channel('sadhna-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sadhna',
+        },
+        async (payload) => {
+          console.log('🕉️ Sadhna table changed:', payload.eventType);
+          
+          // Reload sadhna for affected user
+          if (payload.new?.user_id || payload.old?.user_id) {
+            const affectedUserId = payload.new?.user_id || payload.old?.user_id;
+            
+            // Update current user profile if it's the affected user
+            const currentState = get();
+            if (currentState.currentUserProfile?.id === affectedUserId) {
+              const updatedSadhna = await get().getUserSadhna(affectedUserId);
+              set({
+                currentUserProfile: {
+                  ...currentState.currentUserProfile,
+                  sadhna: updatedSadhna,
+                },
+              });
+            }
+            
+            console.log('✅ Sadhna updated in real-time!');
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to books table changes
+    const booksSubscription = supabase
+      .channel('books-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'books',
+        },
+        async (payload) => {
+          console.log('📚 Books table changed:', payload.eventType);
+          
+          // Reload books
+          await get().loadBooks();
+          
+          console.log('✅ Books updated in real-time!');
+        }
+      )
+      .subscribe();
+
+    // Subscribe to admin_users table changes (for admin status updates)
+    const adminUsersSubscription = supabase
+      .channel('admin-users-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admin_users',
+        },
+        async (payload) => {
+          console.log('🔐 Admin users table changed:', payload.eventType);
+          
+          // Re-initialize to refresh admin status for all users
+          const currentState = get();
+          if (currentState.currentUserProfile?.auth_user_id) {
+            await get().initialize(currentState.currentUserProfile.auth_user_id);
+          } else {
+            await get().initialize();
+          }
+          
+          console.log('✅ Admin status updated in real-time!');
+        }
+      )
+      .subscribe();
+
     // Store subscription references
     set({
       realtimeSubscriptions: {
         users: usersSubscription,
         activities: activitiesSubscription,
         bookDistributions: bookDistributionsSubscription,
+        paymentsToAdmin: paymentsToAdminSubscription,
+        sadhna: sadhnaSubscription,
+        books: booksSubscription,
+        adminUsers: adminUsersSubscription,
       },
     });
 
-    console.log('✅ Real-time subscriptions active!');
+    console.log('✅ All real-time subscriptions active!', {
+      users: !!usersSubscription,
+      activities: !!activitiesSubscription,
+      bookDistributions: !!bookDistributionsSubscription,
+      paymentsToAdmin: !!paymentsToAdminSubscription,
+      sadhna: !!sadhnaSubscription,
+      books: !!booksSubscription,
+      adminUsers: !!adminUsersSubscription,
+    });
   },
 
   // Clean up subscriptions
@@ -1168,6 +1243,10 @@ export const useStore = create((set, get) => ({
       state.realtimeSubscriptions.users?.unsubscribe();
       state.realtimeSubscriptions.activities?.unsubscribe();
       state.realtimeSubscriptions.bookDistributions?.unsubscribe();
+      state.realtimeSubscriptions.paymentsToAdmin?.unsubscribe();
+      state.realtimeSubscriptions.sadhna?.unsubscribe();
+      state.realtimeSubscriptions.books?.unsubscribe();
+      state.realtimeSubscriptions.adminUsers?.unsubscribe();
       set({ realtimeSubscriptions: null });
     }
   },
@@ -1248,21 +1327,18 @@ export const useStore = create((set, get) => ({
 
   updateUserProfile: async (userId, updates) => {
     try {
+      // Note: Book counts and total_money are not stored in users table
+      // They are calculated from book_distributions and activities
       const { error } = await supabase
         .from('users')
         .update({
           name: updates.name,
           city: updates.city,
           mobile_number: updates.mobileNumber || null,
-          other: updates.other || null,
-          photo: updates.photo,
-          hindi_gita: updates.hindiGita,
-          english_gita: updates.englishGita,
-          small_books: updates.smallBooks,
-          bhagavatam: updates.bhagavatam,
-          chaitanya_charitamrita: updates.chaitanyaCharitamrita,
-          other_books: updates.otherBooks,
-          total_money: updates.totalMoney,
+          bace: updates.other || updates.bace || null, // Use 'bace' column name
+          email: updates.email || null,
+          photo: updates.photo || null, // Store photo URL
+          // Book counts and total_money are not stored here
         })
         .eq('id', userId);
 
@@ -1278,17 +1354,38 @@ export const useStore = create((set, get) => ({
                 city: updates.city,
                 mobileNumber: updates.mobileNumber || null,
                 other: updates.other || null,
-                photo: updates.photo,
-                hindiGita: updates.hindiGita,
-                englishGita: updates.englishGita,
-                smallBooks: updates.smallBooks,
-                bhagavatam: updates.bhagavatam,
-                chaitanyaCharitamrita: updates.chaitanyaCharitamrita,
-                otherBooks: updates.otherBooks,
-                totalMoney: updates.totalMoney,
+                photo: updates.photo || null,
+                email: updates.email || null,
+                // Book counts are calculated, not stored
+                hindiGita: 0,
+                englishGita: 0,
+                smallBooks: 0,
+                bhagavatam: 0,
+                chaitanyaCharitamrita: 0,
+                otherBooks: 0,
+                totalMoney: 0,
               }
             : u
         ),
+        currentUserProfile: state.currentUserProfile?.id === userId
+          ? {
+              ...state.currentUserProfile,
+              name: updates.name,
+              city: updates.city,
+              mobileNumber: updates.mobileNumber || null,
+              other: updates.other || null,
+              photo: updates.photo,
+              email: updates.email || null,
+              // Book counts are calculated, not stored
+              hindiGita: 0,
+              englishGita: 0,
+              smallBooks: 0,
+              bhagavatam: 0,
+              chaitanyaCharitamrita: 0,
+              otherBooks: 0,
+              totalMoney: 0,
+            }
+          : state.currentUserProfile,
       }));
 
       console.log('✅ User profile updated successfully');
@@ -1301,45 +1398,12 @@ export const useStore = create((set, get) => ({
   // Helper function to recalculate user totals from all activities
   recalculateUserTotals: async (userId) => {
     try {
-      // Get all activities for this user
-      const { data: activities, error } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('user_id', userId);
+      // Note: Book counts are stored in book_distributions table, not in activities
+      // total_money is calculated from activities, not stored in users table
+      // No need to update users table with these values
+      // Just reload activities to refresh the calculated values
 
-      if (error) throw error;
-
-      // Sum up all activities
-      const totals = activities.reduce(
-        (acc, activity) => ({
-          hindi_gita: acc.hindi_gita + (activity.hindi_gita || 0),
-          english_gita: acc.english_gita + (activity.english_gita || 0),
-          small_books: acc.small_books + (activity.small_books || 0),
-          bhagavatam: acc.bhagavatam + (activity.bhagavatam || 0),
-          chaitanya_charitamrita: acc.chaitanya_charitamrita + (activity.chaitanya_charitamrita || 0),
-          other_books: acc.other_books + (activity.other_books || 0),
-          total_money: acc.total_money + parseFloat(activity.money_received || 0),
-        }),
-        {
-          hindi_gita: 0,
-          english_gita: 0,
-          small_books: 0,
-          bhagavatam: 0,
-          chaitanya_charitamrita: 0,
-          other_books: 0,
-          total_money: 0,
-        }
-      );
-
-      // Update user totals in database
-      const { error: updateError } = await supabase
-        .from('users')
-        .update(totals)
-        .eq('id', userId);
-
-      if (updateError) throw updateError;
-
-      // Reload activities for this user
+      // Reload activities for this user (which will include book_distributions)
       const updatedActivities = await get().loadUserActivities(userId);
 
       // Update local state
@@ -1348,34 +1412,36 @@ export const useStore = create((set, get) => ({
           u.id === userId
             ? {
                 ...u,
-                hindiGita: totals.hindi_gita,
-                englishGita: totals.english_gita,
-                smallBooks: totals.small_books,
-                bhagavatam: totals.bhagavatam,
-                chaitanyaCharitamrita: totals.chaitanya_charitamrita,
-                otherBooks: totals.other_books,
-                totalMoney: totals.total_money,
                 activities: updatedActivities,
+                // Book counts are calculated from book_distributions, not stored
+                hindiGita: 0,
+                englishGita: 0,
+                smallBooks: 0,
+                bhagavatam: 0,
+                chaitanyaCharitamrita: 0,
+                otherBooks: 0,
+                totalMoney: 0, // Calculated from activities when displayed
               }
             : u
         ),
         currentUserProfile: state.currentUserProfile?.id === userId
           ? {
               ...state.currentUserProfile,
-              hindiGita: totals.hindi_gita,
-              englishGita: totals.english_gita,
-              smallBooks: totals.small_books,
-              bhagavatam: totals.bhagavatam,
-              chaitanyaCharitamrita: totals.chaitanya_charitamrita,
-              otherBooks: totals.other_books,
-              totalMoney: totals.total_money,
               activities: updatedActivities,
+              // Book counts are calculated from book_distributions, not stored
+              hindiGita: 0,
+              englishGita: 0,
+              smallBooks: 0,
+              bhagavatam: 0,
+              chaitanyaCharitamrita: 0,
+              otherBooks: 0,
+              totalMoney: 0,
             }
           : state.currentUserProfile,
       }));
 
-      console.log('✅ User totals recalculated from activities:', totals);
-      return totals;
+      console.log('✅ User activities reloaded. Totals are calculated dynamically.');
+      return { success: true };
     } catch (error) {
       console.error('Error recalculating user totals:', error);
       throw error;
@@ -1396,16 +1462,12 @@ export const useStore = create((set, get) => ({
       const userId = currentActivity.user_id;
 
       // Update activity in database
+      // Note: Book counts are stored in book_distributions table, not in activities
       const { error } = await supabase
         .from('activities')
         .update({
           date: updates.date,
-          hindi_gita: updates.hindiGita || 0,
-          english_gita: updates.englishGita || 0,
-          small_books: updates.smallBooks || 0,
-          bhagavatam: updates.bhagavatam || 0,
-          chaitanya_charitamrita: updates.chaitanyaCharitamrita || 0,
-          other_books: updates.otherBooks || 0,
+          // Book counts are in book_distributions, not here
           money_received: updates.moneyReceived || 0,
           money_online: updates.moneyOnline || 0,
           money_offline: updates.moneyOffline || 0,
@@ -1606,7 +1668,7 @@ export const useStore = create((set, get) => ({
         .select(`
           id, 
           name, 
-          photo, 
+          photo,
           auth_user_id,
           auth_users!inner(email)
         `)
@@ -1661,7 +1723,7 @@ export const useStore = create((set, get) => ({
               id: user.id,
               name: user.name,
               email: null,
-              photo: user.photo,
+              photo: user.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=a855f7&color=fff&size=128`,
             } : null,
           };
         });
@@ -1718,7 +1780,7 @@ export const useStore = create((set, get) => ({
             id: user.id,
             name: user.name,
             email: emailMap[user.id] || null,
-            photo: user.photo,
+            photo: user.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=a855f7&color=fff&size=128`,
           } : null,
         };
       });
@@ -1751,90 +1813,9 @@ export const useStore = create((set, get) => ({
 
       if (error) throw error;
 
-      // After approval, update user totals by adding this activity's values
-      const state = get();
-      const user = state.users.find(u => u.id === activity.user_id);
-      
-      if (user) {
-        // Calculate new totals by adding activity values
-        const newHindiGita = user.hindiGita + (activity.hindi_gita || 0);
-        const newEnglishGita = user.englishGita + (activity.english_gita || 0);
-        const newSmallBooks = user.smallBooks + (activity.small_books || 0);
-        const newBhagavatam = (user.bhagavatam || 0) + (activity.bhagavatam || 0);
-        const newChaitanyaCharitamrita = (user.chaitanyaCharitamrita || 0) + (activity.chaitanya_charitamrita || 0);
-        const newOtherBooks = (user.otherBooks || 0) + (activity.other_books || 0);
-        const newTotalMoney = user.totalMoney + parseFloat(activity.money_received || 0);
-
-        // Update user totals in database
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            hindi_gita: newHindiGita,
-            english_gita: newEnglishGita,
-            small_books: newSmallBooks,
-            bhagavatam: newBhagavatam,
-            chaitanya_charitamrita: newChaitanyaCharitamrita,
-            other_books: newOtherBooks,
-            total_money: newTotalMoney,
-          })
-          .eq('id', activity.user_id);
-
-        if (updateError) throw updateError;
-
-        // Get book distributions for this activity
-        const { data: bookDistributions } = await supabase
-          .from('book_distributions')
-          .select('*')
-          .eq('activity_id', activityId);
-
-        // Update user's bookDistributions object
-        const updatedBookDistributions = { ...user.bookDistributions || {} };
-        if (bookDistributions) {
-          bookDistributions.forEach(bd => {
-            updatedBookDistributions[bd.book_id] = (updatedBookDistributions[bd.book_id] || 0) + (bd.count || 0);
-          });
-        }
-
-        // Update local state
-        set((state) => {
-          const updatedUsers = state.users.map((u) =>
-            u.id === activity.user_id
-              ? {
-                  ...u,
-                  hindiGita: newHindiGita,
-                  englishGita: newEnglishGita,
-                  smallBooks: newSmallBooks,
-                  bhagavatam: newBhagavatam,
-                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
-                  otherBooks: newOtherBooks,
-                  totalMoney: newTotalMoney,
-                  bookDistributions: updatedBookDistributions,
-                }
-              : u
-          );
-
-          // Update currentUserProfile if it's the same user
-          const updatedCurrentUserProfile = 
-            state.currentUserProfile?.id === activity.user_id
-              ? {
-                  ...state.currentUserProfile,
-                  hindiGita: newHindiGita,
-                  englishGita: newEnglishGita,
-                  smallBooks: newSmallBooks,
-                  bhagavatam: newBhagavatam,
-                  chaitanyaCharitamrita: newChaitanyaCharitamrita,
-                  otherBooks: newOtherBooks,
-                  totalMoney: newTotalMoney,
-                  bookDistributions: updatedBookDistributions,
-                }
-              : state.currentUserProfile;
-
-          return {
-            users: updatedUsers,
-            currentUserProfile: updatedCurrentUserProfile,
-          };
-        });
-      }
+      // Note: Book counts and total_money are no longer stored in users table
+      // They are calculated from book_distributions and activities tables
+      // Just reload activities to refresh the calculated values
 
       // Reload activities to refresh the list
       await get().loadUserActivities(activity.user_id, true);
@@ -1862,4 +1843,375 @@ export const useStore = create((set, get) => ({
       throw error;
     }
   },
+
+  // Sadhna functions
+  submitSadhna: async (sadhnaData, userId) => {
+    try {
+      const { error } = await supabase
+        .from('sadhna')
+        .upsert({
+          user_id: userId,
+          date: sadhnaData.date,
+          wake_up_time: sadhnaData.wakeUpTime || null,
+          mangla_arti: sadhnaData.manglaArti || false,
+          tulsi_arti: sadhnaData.tulsiArti || false,
+          guru_puja: sadhnaData.guruPuja || false,
+          sandhya_arti: sadhnaData.sandhyaArti || false,
+          first_round_timing: sadhnaData.firstRoundTiming || null,
+          last_round_timing: sadhnaData.lastRoundTiming || null,
+          total_rounds: sadhnaData.totalRounds || 0,
+          lecture_hearing: sadhnaData.lectureHearing || null,
+          book_reading: sadhnaData.bookReading || null,
+          services_done: sadhnaData.servicesDone || null,
+        }, {
+          onConflict: 'user_id,date',
+        });
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error submitting sadhna:', error);
+      throw error;
+    }
+  },
+
+  getSadhnaForDate: async (userId, date) => {
+    try {
+      const { data, error } = await supabase
+        .from('sadhna')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+      
+      if (!data) return null;
+
+      return {
+        id: data.id,
+        wakeUpTime: data.wake_up_time || '',
+        manglaArti: data.mangla_arti || false,
+        tulsiArti: data.tulsi_arti || false,
+        guruPuja: data.guru_puja || false,
+        sandhyaArti: data.sandhya_arti || false,
+        firstRoundTiming: data.first_round_timing || '',
+        lastRoundTiming: data.last_round_timing || '',
+        totalRounds: data.total_rounds || 0,
+        lectureHearing: data.lecture_hearing || '',
+        bookReading: data.book_reading || '',
+        servicesDone: data.services_done || '',
+        date: data.date,
+      };
+    } catch (error) {
+      console.error('Error fetching sadhna:', error);
+      throw error;
+    }
+  },
+
+  getAllSadhna: async () => {
+    try {
+      // Fetch sadhna with user info
+      const { data: sadhnaData, error } = await supabase
+        .from('sadhna')
+        .select(`
+          *,
+          users!inner (
+            id,
+            name,
+            photo,
+            auth_user_id
+          )
+        `)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch emails separately using RPC function
+      let emailMap = {};
+      try {
+        const { data: emailsData } = await supabase.rpc('get_users_with_email').catch(() => null);
+        if (emailsData) {
+          emailsData.forEach((item) => {
+            if (item.id && item.email) {
+              emailMap[item.id] = item.email;
+            }
+          });
+        }
+      } catch (err) {
+        console.log('Email fetch not available for sadhna, continuing without email');
+      }
+
+      // Transform the data
+      return sadhnaData.map((sadhna) => {
+        const user = sadhna.users;
+        const email = emailMap[user?.id] || null;
+
+        return {
+          id: sadhna.id,
+          userId: sadhna.user_id,
+          userName: user?.name || 'Unknown',
+          userPhoto: user?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=a855f7&color=fff&size=128`,
+          userEmail: email,
+          date: sadhna.date,
+          wakeUpTime: sadhna.wake_up_time || '',
+          manglaArti: sadhna.mangla_arti || false,
+          tulsiArti: sadhna.tulsi_arti || false,
+          guruPuja: sadhna.guru_puja || false,
+          sandhyaArti: sadhna.sandhya_arti || false,
+          firstRoundTiming: sadhna.first_round_timing || '',
+          lastRoundTiming: sadhna.last_round_timing || '',
+          totalRounds: sadhna.total_rounds || 0,
+          lectureHearing: sadhna.lecture_hearing || '',
+          bookReading: sadhna.book_reading || '',
+          servicesDone: sadhna.services_done || '',
+          createdAt: sadhna.created_at,
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching all sadhna:', error);
+      throw error;
+    }
+  },
+
+  getUserSadhna: async (userId) => {
+    try {
+      const { data: sadhnaData, error } = await supabase
+        .from('sadhna')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      return sadhnaData.map((sadhna) => ({
+        id: sadhna.id,
+        date: sadhna.date,
+        wakeUpTime: sadhna.wake_up_time || '',
+        manglaArti: sadhna.mangla_arti || false,
+        tulsiArti: sadhna.tulsi_arti || false,
+        guruPuja: sadhna.guru_puja || false,
+        sandhyaArti: sadhna.sandhya_arti || false,
+        firstRoundTiming: sadhna.first_round_timing || '',
+        lastRoundTiming: sadhna.last_round_timing || '',
+        totalRounds: sadhna.total_rounds || 0,
+        lectureHearing: sadhna.lecture_hearing || '',
+        bookReading: sadhna.book_reading || '',
+        servicesDone: sadhna.services_done || '',
+        createdAt: sadhna.created_at,
+      }));
+    } catch (error) {
+      console.error('Error fetching user sadhna:', error);
+      throw error;
+    }
+  },
+
+  // Load payments to admin for a user
+  loadPaymentsToAdmin: async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('payments_to_admin')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error loading payments to admin:', error);
+      throw error;
+    }
+  },
+
+  // Submit payment to admin
+  submitPaymentToAdmin: async (userId, paymentData) => {
+    try {
+      const { data, error } = await supabase
+        .from('payments_to_admin')
+        .insert([
+          {
+            user_id: userId,
+            date: paymentData.date,
+            money_online: paymentData.onlineAmount || 0,
+            money_offline: paymentData.offlineAmount || 0,
+            total_amount: (paymentData.onlineAmount || 0) + (paymentData.offlineAmount || 0),
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error submitting payment to admin:', error);
+      throw error;
+    }
+  },
+
+  // Approve user (admin only)
+  approveUser: async (userId) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ approval_status: 'approved' })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Update local state
+      set((state) => ({
+        users: state.users.map(u =>
+          u.id === userId ? { ...u, approvalStatus: 'approved' } : u
+        ),
+      }));
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error approving user:', error);
+      throw error;
+    }
+  },
+
+  // Reject user (admin only) - Completely deletes user data from database
+  rejectUser: async (userId) => {
+    try {
+      // First, get the user's auth_user_id before deleting
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('auth_user_id')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const authUserId = userData?.auth_user_id;
+
+      // Step 1: Delete from admin_users table if user is admin
+      if (authUserId) {
+        try {
+          const { error: adminDeleteError } = await supabase
+            .from('admin_users')
+            .delete()
+            .eq('auth_user_id', authUserId);
+
+          if (adminDeleteError) {
+            console.warn('Could not delete admin record (may not exist):', adminDeleteError);
+          } else {
+            console.log('✅ Admin record deleted');
+          }
+        } catch (adminErr) {
+          console.warn('Error deleting admin record:', adminErr);
+        }
+      }
+
+      // Step 2: Delete from users table (activities, book_distributions, payments_to_admin, sadhna will cascade delete)
+      const { error, data } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId)
+        .select();
+
+      if (error) {
+        console.error('Error deleting user from users table:', error);
+        // Check if it's an RLS policy error
+        if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission')) {
+          throw new Error('Permission denied: Admin delete policy may not be set. Please run database/15_add_user_delete_policy.sql');
+        }
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        console.warn('User not found or already deleted:', userId);
+        // User might already be deleted, continue anyway
+      } else {
+        console.log('✅ User deleted from users table:', userId);
+      }
+
+      // Step 3: Delete from auth.users using RPC function (requires database function)
+      if (authUserId) {
+        try {
+          // Call database function to delete auth user
+          // This function must be created in Supabase with proper permissions
+          const { error: authDeleteError } = await supabase.rpc('delete_auth_user', {
+            user_auth_id: authUserId
+          });
+
+          if (authDeleteError) {
+            console.warn('Could not delete auth user (may require manual deletion):', authDeleteError);
+            console.warn('⚠️ User profile deleted but auth account still exists. User will need to signup again.');
+          } else {
+            console.log('✅ Auth user deleted successfully');
+          }
+        } catch (rpcErr) {
+          console.warn('Error calling delete_auth_user RPC:', rpcErr);
+          console.warn('⚠️ User profile deleted but auth account may still exist. User will need to signup again.');
+        }
+      }
+
+      // Update local state - remove user from list
+      set((state) => ({
+        users: state.users.filter((u) => u.id !== userId),
+      }));
+
+      console.log('✅ User rejected and deleted successfully from database');
+      return { success: true };
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+      throw error;
+    }
+  },
+
+  // Get app config value
+  getAppConfig: async (key) => {
+    try {
+      const { data, error } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', key)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+      
+      return data?.value || null;
+    } catch (error) {
+      console.error('Error getting app config:', error);
+      // Return default value if config doesn't exist
+      if (key === 'require_admin_approval') {
+        return 'true'; // Default to requiring approval
+      }
+      return null;
+    }
+  },
+
+  // Update app config value
+  updateAppConfig: async (key, value) => {
+    try {
+      const upsertData = {
+        key,
+        value,
+        updated_at: new Date().toISOString(),
+      };
+      
+      const upsertOptions = {
+        onConflict: 'key',
+      };
+      
+      const { data, error } = await supabase
+        .from('app_config')
+        .upsert(upsertData, upsertOptions)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Error updating app config:', error);
+      throw error;
+    }
+  }
 }));
